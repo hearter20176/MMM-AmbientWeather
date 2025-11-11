@@ -33,35 +33,35 @@ A modern, real-time Ambient Weather display module for MagicMirror²
 
 Navigate to your MagicMirror modules directory:
 
-cd ~/MagicMirror/modules
+```cd ~/MagicMirror/modules```
 
 
 Clone this repository:
 
-git clone https://github.com/YOURUSERNAME/MMM-AmbientWeather.git
+```git clone https://github.com/hearter20176/MMM-AmbientWeather.git```
 
 
 Install dependencies:
 
-cd MMM-AmbientWeather
-npm install
+```cd MMM-AmbientWeather
+npm install```
 
 
 (Optional) Create the animations folder if not present:
 
-mkdir animations
+```mkdir animations```
 
 
 Then place your Lottie JSON
  weather animations inside.
 Example filenames:
 
-clear_day.json
+```clear_day.json
 clear_night.json
 partly_cloudy_day.json
 rain.json
 thunderstorm.json
-...
+...```
 
 
 Add the module to your MagicMirror config.js file (see below).
@@ -70,7 +70,7 @@ Add the module to your MagicMirror config.js file (see below).
 
 Add the following to your config/config.js:
 
-{
+```{
   module: "MMM-AmbientWeather",
   position: "top_right",
   config: {
@@ -90,7 +90,7 @@ Add the following to your config/config.js:
     offlineThreshold: 300000,    // fade card if no update after 5 min
     animateIcons: true,
   }
-}
+}```
 
 🛠️ Options
 Option	Type	Default	Description
@@ -157,15 +157,15 @@ Rain & Lightning
 
 MagicMirror²
 
-ambient-weather-api
+```ambient-weather-api```
 
-bodymovin (Lottie)
+```bodymovin``` (Lottie)
 
-suncalc
+```suncalc```
 
 🧑‍💻 Credits
 
-Author: Harry Arter & ChatGPT (GPT-5 collaborative build)
+Author: Harry Arter
 
 Realtime Data: Ambient Weather API
 
