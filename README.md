@@ -33,44 +33,54 @@ A modern, real-time Ambient Weather display module for MagicMirror²
 
 Navigate to your MagicMirror modules directory:
 
-```cd ~/MagicMirror/modules```
+```
+cd ~/MagicMirror/modules
+```
 
 
 Clone this repository:
 
-```git clone https://github.com/hearter20176/MMM-AmbientWeather.git```
+```
+git clone https://github.com/hearter20176/MMM-AmbientWeather.git
+```
 
 
 Install dependencies:
 
-```cd MMM-AmbientWeather```
-```npm install```
+```
+cd MMM-AmbientWeather
+npm install
+```
 
 
 (Optional) Create the animations folder if not present:
 
-```mkdir animations```
+```
+mkdir animations
+```
 
 
-Then place your Lottie JSON
- weather animations inside.
+Then place your Lottie JSON weather animations inside.
 Example filenames:
 
-```clear_day.json
+```js
+clear_day.json
 clear_night.json
 partly_cloudy_day.json
 rain.json
 thunderstorm.json
-...```
+...
+```
 
 
-Add the module to your MagicMirror config.js file (see below).
+Add the module to your MagicMirror ```config.js``` file (see below).
 
 ⚙️ Configuration
 
-Add the following to your config/config.js:
+Add the following to your ```config/config.js```:
 
-```{
+```js
+  {
   module: "MMM-AmbientWeather",
   position: "top_right",
   config: {
@@ -157,11 +167,17 @@ Rain & Lightning
 
 MagicMirror²
 
-```ambient-weather-api```
+```js
+ambient-weather-api
+```
 
-```bodymovin``` (Lottie)
+```js
+bodymovin
+``` (Lottie)
 
-```suncalc```
+```js
+suncalc
+```
 
 🧑‍💻 Credits
 
