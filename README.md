@@ -104,22 +104,277 @@ Add the following to your ```config/config.js```:
 ```
 
 🛠️ Options
-Option	Type	Default	Description
-title	string	"Home Weather"	Optional title for the card.
-apiKey	string	Required	Your Ambient Weather API key.
-applicationKey	string	Required	Your Ambient Weather app key.
-macAddress	string	Required	MAC address of your station.
-units	string	"imperial"	"imperial" or "metric".
-showIndoor	boolean	true	Show indoor temperature/humidity.
-showAQI	boolean	true	Display Air Quality Index badge.
-showUV	boolean	true	Display UV Index badge.
-showSunTimes	boolean	true	Show sunrise/sunset times.
-latitude	float	—	Fallback location if device lacks coordinates.
-longitude	float	—	Fallback location if device lacks coordinates.
-updateInterval	int	30000	Refresh interval (milliseconds).
-offlineThreshold	int	300000	Time until module grays out when data stale.
-animateIcons	boolean	true	Enable Lottie animated weather icons.
-animations	object	(JSON map)	Map of weather types to animation filenames.
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+| Option             | Type      | Default          | Description                                    |
+| :----------------- | :-------- | :--------------- | :--------------------------------------------- |
+| `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
+| `apiKey`           | `string`  | **Required**     | Your Ambient Weather API key.                  |
+| `applicationKey`   | `string`  | **Required**     | Your Ambient Weather app key.                  |
+| `macAddress`       | `string`  | **Required**     | MAC address of your station.                   |
+| `units`            | `string`  | `"imperial"`     | `"imperial"` or `"metric"`.                    |
+| `showIndoor`       | `boolean` | `true`           | Show indoor temperature/humidity.              |
+| `showAQI`          | `boolean` | `true`           | Display Air Quality Index badge.               |
+| `showUV`           | `boolean` | `true`           | Display UV Index badge.                        |
+| `showSunTimes`     | `boolean` | `true`           | Show sunrise/sunset times.                     |
+| `latitude`         | `float`   | —                | Fallback location if device lacks coordinates. |
+| `longitude`        | `float`   | —                | Fallback location if device lacks coordinates. |
+| `updateInterval`   | `int`     | `30000`          | Refresh interval (milliseconds).               |
+| `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
+| `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
+| `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+
+
 🌈 Data Displayed
 
 Temperature (°F/°C)
@@ -158,12 +413,13 @@ Offline Mode:
 The card fades and becomes grayscale when no data >5 min.
 
 🧭 Example Screens
-Condition	Preview
-Day - Clear	
 
-Night - Cloudy	
+| Condition        | Preview                     |
+| ---------------- | --------------------------- |
+| Day - Clear      | ![](docs/preview_day.png)   |
+| Night - Cloudy   | ![](docs/preview_night.png) |
+| Rain & Lightning | ![](docs/preview_rain.png)  |
 
-Rain & Lightning	
 🧰 Dependencies
 
 MagicMirror²
@@ -184,9 +440,9 @@ suncalc
 
 Author: Harry Arter
 
-Realtime Data: Ambient Weather API
+Realtime Data: [Ambient Weather API](https://ambientweather.net/)
 
-Animations: LottieFiles.com
+Animations: [LottieFiles.com]https://lottiefiles.com/
 
 UI Design Inspiration: iOS “Liquid Glass” & weather dashboard aesthetics
 
