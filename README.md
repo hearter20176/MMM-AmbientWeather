@@ -100,7 +100,8 @@ Add the following to your ```config/config.js```:
     offlineThreshold: 300000,    // fade card if no update after 5 min
     animateIcons: true,
   }
-}```
+}
+```
 
 🛠️ Options
 Option	Type	Default	Description
