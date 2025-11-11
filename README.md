@@ -1,11 +1,11 @@
-🧊 MMM-AmbientWeather
+# 🧊 MMM-AmbientWeather
 
 A modern, real-time Ambient Weather display module for MagicMirror²
- featuring liquid-glass UI, 3D animated weather icons, dynamic AQI and UV gradients, and realtime data streaming via the Ambient Weather Realtime API
-.
+ featuring liquid-glass UI, 3D animated weather icons, dynamic AQI and UV gradients, and realtime data streaming via the Ambient Weather Realtime API.
 
-<p align="center"> <img src="docs/preview_day.png" width="400"/> <img src="docs/preview_night.png" width="400"/> </p>
-✨ Features
+<p align="center"> <img src="docs/MMM-AmbientWeather_loading_spinner.png" width="400"/> <img src="docs/MMM-AmbientWeather_night.png" width="400"/> </p>
+
+## ✨ Features
 
 🔄 Realtime weather updates via Ambient Weather’s Realtime API
 
@@ -29,7 +29,7 @@ A modern, real-time Ambient Weather display module for MagicMirror²
 
 🧭 Supports both Imperial and Metric units
 
-🧩 Installation
+## 🧩 Installation
 
 Navigate to your MagicMirror modules directory:
 
@@ -75,7 +75,7 @@ thunderstorm.json
 
 Add the module to your MagicMirror ```config.js``` file (see below).
 
-⚙️ Configuration
+## ⚙️ Configuration
 
 Add the following to your ```config/config.js```:
 
@@ -103,7 +103,8 @@ Add the following to your ```config/config.js```:
 }
 ```
 
-🛠️ Options
+## 🛠️ Options
+
 | Option             | Type      | Default          | Description                                    |
 | :----------------- | :-------- | :--------------- | :--------------------------------------------- |
 | `title`            | `string`  | `"Home Weather"` | Optional title for the card.                   |
@@ -122,7 +123,7 @@ Add the following to your ```config/config.js```:
 | `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
 | `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
 
-🌈 Data Displayed
+## 🌈 Data Displayed
 
 Temperature (°F/°C)
 
@@ -142,7 +143,7 @@ Rain and Lightning detection
 
 Offline indicator / last updated
 
-🪩 Visual Effects
+## 🪩 Visual Effects
 
 Liquid Glass Card:
 A translucent, frosted background with blur, bevel, and raised border.
@@ -159,15 +160,15 @@ Smooth gradient transitions based on live values.
 Offline Mode:
 The card fades and becomes grayscale when no data >5 min.
 
-🧭 Example Screens
+## 🧭 Example Screens
 
 | Condition        | Preview                     |
 | ---------------- | --------------------------- |
 | Day - Clear      | ![](docs/preview_day.png)   |
-| Night - Cloudy   | ![](docs/preview_night.png) |
+| Night - Cloudy   | ![](docs/MMM-AmbientWeather_night.png) |
 | Rain & Lightning | ![](docs/preview_rain.png)  |
 
-🧰 Dependencies
+## 🧰 Dependencies
 
 MagicMirror²
 
@@ -184,7 +185,7 @@ bodymovin
 suncalc
 ```
 
-🧑‍💻 Credits
+## 🧑‍💻 Credits
 
 Author: Harry Arter
 
@@ -194,7 +195,7 @@ Animations: [LottieFiles.com]https://lottiefiles.com/
 
 UI Design Inspiration: iOS “Liquid Glass” & weather dashboard aesthetics
 
-🪪 License
+## 🪪 License
 
 This module is released under the [MIT License](LICENSE).
 
