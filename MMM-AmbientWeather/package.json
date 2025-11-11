@@ -1,0 +1,10 @@
+{
+	"name": "MMM-AmbientWeather",
+	"version": "1.2.0",
+	"description": "MagicMirror Ambient Weather realtime (socket.io) with local Lottie animations and liquid-glass UI",
+	"main": "node_helper.js",
+	"dependencies": {
+		"socket.io-client": "^4.8.1",
+		"suncalc": "^1.9.0"
+	}
+}
