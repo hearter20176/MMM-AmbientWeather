@@ -43,8 +43,8 @@ Clone this repository:
 
 Install dependencies:
 
-```cd MMM-AmbientWeather
-npm install```
+```cd MMM-AmbientWeather```
+```npm install```
 
 
 (Optional) Create the animations folder if not present:
