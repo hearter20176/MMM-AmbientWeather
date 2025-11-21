@@ -91,11 +91,15 @@ Add the following to your ```config/config.js```:
     macAddress: "xx:xx:xx:xx:xx:xx",
     units: "imperial",           // "imperial" or "metric"
     showIndoor: true,
-    showAQI: true,
     showUV: true,
     showSunTimes: true,
+    showBarometer: true,
+    pressureTrendThreshold: 0.01,
     latitude: 40.7128,           // optional fallback
     longitude: -74.0060,
+    showNwsForecast: true,
+    forecastDays: 3,
+    forecastCacheMinutes: 90,
     updateInterval: 30000,       // milliseconds
     offlineThreshold: 300000,    // fade card if no update after 5 min
     animateIcons: true,
@@ -200,3 +204,7 @@ UI Design Inspiration: iOS “Liquid Glass” & weather dashboard aesthetics
 This module is released under the [MIT License](LICENSE).
 
 Feel free to fork, enhance, and share improvements!
+
+## Local Lottie
+
+This module ships with a local copy of `vendor/lottie.min.js` to avoid CDN/network blocking. No CDN fetch is needed at runtime.
