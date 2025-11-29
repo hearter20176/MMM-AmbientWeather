@@ -4,22 +4,25 @@
 
 .MMM-AmbientWeather {
   display: flex;
-  flex-direction: column;
+  flex-direction: right;
   align-items: center;
   justify-content: center;
   color: #e9edf5;
-  margin: 10px;
   transition: opacity 0.6s ease, filter 0.6s ease;
   font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", -apple-system, system-ui, sans-serif;
   letter-spacing: 0.01em;
+  transition: opacity 0.6s ease, filter 0.6s ease;
+  box-sizing: border-box;
 }
 
 /* === Liquid glass card === */
 .glass-card {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: none;
-  padding: 16px 18px 18px;
+  padding: 16px;
   border-radius: 26px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow:
@@ -102,8 +105,8 @@
 
 .spinner {
   display: inline-block;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border: 2px solid rgba(255, 255, 255, 0.26);
   border-top-color: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
@@ -128,6 +131,7 @@
   justify-content: space-between;
   width: 100%;
   gap: 14px;
+  flex: 1;
 }
 
 .main-left {
@@ -191,6 +195,10 @@
 .sun-item i {
   color: #f8d365;
   font-size: 13px;
+}
+
+.sun-item .fa-moon {
+  color: #7dd3fc;
 }
 
 /* Weather metrics */
@@ -257,11 +265,12 @@
 
 /* Forecast */
 .forecast {
-  margin-top: 10px;
-  padding: 8px 10px;
+  margin-top: auto;
+  padding: 10px 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(4px);
+  flex-shrink: 0;
 }
 
 .forecast-title {
@@ -275,21 +284,24 @@
 .forecast-grid {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 8px;
   align-items: stretch;
+  justify-content: space-between;
 }
 
 .forecast-day {
-  padding: 6px;
+  padding: 8px 6px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.05));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   display: grid;
   grid-template-rows: auto auto auto auto;
-  gap: 2px;
+  gap: 3px;
   justify-items: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .forecast-name {

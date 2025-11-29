@@ -10,6 +10,8 @@ Module.register("MMM-AmbientWeather", {
     updateInterval: 30 * 1000,
     offlineThreshold: 5 * 60 * 1000,
     animateIcons: true,
+    performanceProfile: "auto", // auto | pi | full
+    reduceMotion: false,
     minWidth: 260,
     showSunTimes: true,
     showUV: true,
@@ -54,7 +56,10 @@ Module.register("MMM-AmbientWeather", {
   },
 
   getScripts() {
-    return [this.file("vendor/lottie.min.js")];
+    if (this._shouldUseLottie()) {
+      return [this.file("vendor/lottie.min.js")];
+    }
+    return [];
   },
 
   getStyles() {
@@ -75,6 +80,14 @@ Module.register("MMM-AmbientWeather", {
     this.lastForecastFetch = 0;
     this.latestForecastRenderKey = null;
     this.forecastAnimQueue = [];
+    this.performanceProfile = this._resolvePerformanceProfile();
+    this.reduceMotion =
+      this.config.reduceMotion === true ||
+      this.performanceProfile === "pi" ||
+      (typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    this.enableLottie = this.config.animateIcons && !this.reduceMotion;
 
     this.sendSocketNotification("CONNECT_AMBIENT", {
       apiKey: this.config.apiKey,
@@ -108,6 +121,7 @@ Module.register("MMM-AmbientWeather", {
       this.lastUpdate = Date.now();
       this.loaded = true;
       this.offline = false;
+      this._broadcastCurrentConditions(data);
       this.safeUpdateDom(500);
       this._maybeRequestForecast();
     }
@@ -246,6 +260,35 @@ Module.register("MMM-AmbientWeather", {
     return now >= new Date(d.sunrise) && now <= new Date(d.sunset);
   },
 
+  _broadcastCurrentConditions(data) {
+    if (!data) return;
+    const tempF = typeof data.tempf === "number" ? data.tempf : null;
+    const temperature =
+      this.config.units === "metric" && tempF !== null
+        ? ((tempF - 32) * 5) / 9
+        : tempF;
+    const condKey = this._currentCondition(data) || "partly_cloudy";
+    const conditionRaw =
+      data.weather || data.conditions || data.icon || condKey || "";
+    const condition = `${conditionRaw}`.replace(/[_]+/g, " ").trim();
+    const isDaytime = this._isDay(data);
+    const payload = {
+      temperature,
+      condition,
+      conditionCode: data.weatherCode ?? data.iconCode ?? undefined,
+      aqi: data.aqi,
+      uv: data.uv,
+      sunrise: data.sunrise,
+      sunset: data.sunset,
+      isDaytime,
+      lottie: this.enableLottie
+        ? this._resolveAnimationFile(condKey, isDaytime)
+        : null
+    };
+
+    this.sendNotification("AMBIENT_WEATHER_DATA", payload);
+  },
+
   _resolveAnimationFile(cond, isDay) {
     const animations = this.config.animations || {};
     const preferred = animations[cond] ||
@@ -319,6 +362,7 @@ Module.register("MMM-AmbientWeather", {
   },
 
   _playAnimationFor(elementId, animationFile) {
+    if (!this.enableLottie || !animationFile) return;
     const el = document.getElementById(elementId);
     if (!el) return;
     const path = this.file(`animations/${animationFile}`);
@@ -339,6 +383,7 @@ Module.register("MMM-AmbientWeather", {
     attempts = 20,
     delay = 200
   ) {
+    if (!this.enableLottie || !animationFile) return;
     const el = document.getElementById(elementId);
     const isForecast = elementId.startsWith("forecast-anim-");
     if (
@@ -374,6 +419,30 @@ Module.register("MMM-AmbientWeather", {
     if (uvValue === undefined || uvValue === null) return null;
     const level = Math.min(11, Math.max(1, Math.round(uvValue)));
     return `uv-index-${level}.json`;
+  },
+
+  _resolvePerformanceProfile() {
+    const requested = (this.config.performanceProfile || "auto").toLowerCase();
+    if (requested === "pi" || requested === "full") return requested;
+    const ua =
+      typeof navigator !== "undefined" && navigator.userAgent ? navigator.userAgent : "";
+    const isPi =
+      ua.includes("raspberry") ||
+      ua.includes("armv7") ||
+      ua.includes("aarch64") ||
+      ua.includes("linux arm");
+    return isPi ? "pi" : "full";
+  },
+
+  _shouldUseLottie() {
+    const profile = (this.config.performanceProfile || "auto").toLowerCase();
+    const forceReduce =
+      this.config.reduceMotion === true ||
+      profile === "pi" ||
+      (typeof window !== "undefined" &&
+        window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    return this.config.animateIcons && !forceReduce;
   },
 
   _processForecastAnimQueue() {
@@ -449,6 +518,13 @@ Module.register("MMM-AmbientWeather", {
     animDiv.id = animId;
     animDiv.className = "anim-container";
     left.appendChild(animDiv);
+    if (!this.enableLottie) {
+      const icon = document.createElement("i");
+      icon.className = "fa fa-cloud";
+      icon.style.fontSize = "64px";
+      icon.style.color = "#e9edf5";
+      animDiv.appendChild(icon);
+    }
 
     // UV animation under main icon
     if (this.config.showUV && d.uv !== undefined) {
@@ -466,7 +542,7 @@ Module.register("MMM-AmbientWeather", {
       left.appendChild(uvRow);
 
       const uvFile = this._uvAnimationFile(d.uv);
-      if (uvFile && this.config.animateIcons) {
+      if (uvFile && this.enableLottie) {
         setTimeout(() => this._playAnimationWhenReady(uvAnimId, uvFile), 200);
       }
     }
@@ -573,7 +649,9 @@ Module.register("MMM-AmbientWeather", {
           const condRaw = day?.cond || this._conditionFromText(phrase);
           const cond = condRaw || "partly_cloudy";
           const animId = `forecast-anim-${renderKey}-${idx}`;
-          forecastAnims.push({ animId, cond, isDay: day?.isDaytime !== false });
+          if (this.enableLottie) {
+            forecastAnims.push({ animId, cond, isDay: day?.isDaytime !== false });
+          }
           return `
           <div class="forecast-day">
             <div class="forecast-name">${dayName}</div>
@@ -589,18 +667,20 @@ Module.register("MMM-AmbientWeather", {
       wrapper.appendChild(fc);
 
       setTimeout(() => {
-        const latestKey = this.latestForecastRenderKey;
-        const queue = forecastAnims
-          .filter((f) => `${f.animId}`.includes(latestKey))
-          .map(({ animId, cond, isDay }) => ({
-            id: animId,
-            file: this._resolveAnimationFile(cond, isDay),
-            isDay,
-            attempts: 30,
-            renderKey: latestKey
-          }));
-        this.forecastAnimQueue = queue;
-        if (this.forecastAnimQueue.length) this._processForecastAnimQueue();
+        if (this.enableLottie && forecastAnims.length) {
+          const latestKey = this.latestForecastRenderKey;
+          const queue = forecastAnims
+            .filter((f) => `${f.animId}`.includes(latestKey))
+            .map(({ animId, cond, isDay }) => ({
+              id: animId,
+              file: this._resolveAnimationFile(cond, isDay),
+              isDay,
+              attempts: 30,
+              renderKey: latestKey
+            }));
+          this.forecastAnimQueue = queue;
+          if (this.forecastAnimQueue.length) this._processForecastAnimQueue();
+        }
       }, 400);
     }
 
@@ -623,9 +703,9 @@ Module.register("MMM-AmbientWeather", {
       const cond = this._currentCondition(d);
       const isDay = this._isDay(d);
       const animFile = this._resolveAnimationFile(cond, isDay);
-      if (this.config.animateIcons && animFile) {
+      if (this.enableLottie && animFile) {
         this._playAnimationWhenReady(animId, animFile);
-      } else if (this.config.animateIcons) {
+      } else if (this.enableLottie) {
         const fallback =
           this.config.animations?.default?.[isDay ? "day" : "night"];
         if (fallback) this._playAnimationWhenReady(animId, fallback);

@@ -103,9 +103,13 @@ Add the following to your ```config/config.js```:
     updateInterval: 30000,       // milliseconds
     offlineThreshold: 300000,    // fade card if no update after 5 min
     animateIcons: true,
+    performanceProfile: "auto",  // "auto" | "pi" | "full"
+    reduceMotion: false          // true disables Lottie on low-power or reduced-motion setups
   }
 }
 ```
+
+Note: For the weather.gov forecast API, keep `latitude` and `longitude` to 4 decimal places or fewer. More precision can cause the API to reject the request.
 
 ## 🛠️ Options
 
@@ -126,6 +130,8 @@ Add the following to your ```config/config.js```:
 | `offlineThreshold` | `int`     | `300000`         | Time until module grays out when data stale.   |
 | `animateIcons`     | `boolean` | `true`           | Enable Lottie animated weather icons.          |
 | `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
+| `performanceProfile` | `string` | `"auto"`        | `"auto"` detects Pi/ARM to lower motion, `"pi"` forces low-motion, `"full"` keeps all effects. |
+| `reduceMotion`     | `boolean` | `false`          | Force-disable Lottie/motion (also triggered by `prefers-reduced-motion`). |
 
 ## 🌈 Data Displayed
 
