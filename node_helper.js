@@ -107,11 +107,29 @@ module.exports = NodeHelper.create({
 
     this._fetchJson(pointsUrl)
       .then((points) => {
-        const forecastUrl = points?.properties?.forecast;
-        if (!forecastUrl) throw new Error("No forecast URL from weather.gov");
+        const props = points?.properties || {};
+        const fallbackGridUrl = props.gridId !== undefined &&
+          props.gridX !== undefined &&
+          props.gridY !== undefined
+          ? `https://api.weather.gov/gridpoints/${props.gridId}/${props.gridX},${props.gridY}/forecast`
+          : null;
+        const forecastUrl = props.forecast || fallbackGridUrl;
+
+        if (!forecastUrl) {
+          const detail = points?.detail || points?.title || "unknown response";
+          console.warn(
+            `[${this.name}] No forecast URL from weather.gov. Detail: ${detail}`
+          );
+          const empty = { forecast: [] };
+          this.forecastCache = { ts: Date.now(), data: empty };
+          this.sendSocketNotification("NWS_FORECAST", empty);
+          return null;
+        }
+
         return this._fetchJson(forecastUrl);
       })
       .then((json) => {
+        if (!json) return;
         const periods = Array.isArray(json?.properties?.periods) ? json.properties.periods : [];
         const daysOnly = periods.filter((p) => p.isDaytime).slice(0, limit);
         const forecast = daysOnly.map((p, idx) => {
@@ -135,7 +153,18 @@ module.exports = NodeHelper.create({
         this.sendSocketNotification("NWS_FORECAST", { forecast });
       })
       .catch((err) => {
-        console.error(`[${this.name}] Forecast fetch error:`, err.message || err);
+        const msg = err?.message || `${err}`;
+        const isInvalidPoint = /invalidpoint|data unavailable|no forecast url/i.test(msg);
+        if (isInvalidPoint) {
+          console.warn(
+            `[${this.name}] Forecast unavailable for lat/lon ${lat},${lon}: ${msg}`
+          );
+          const empty = { forecast: [] };
+          this.forecastCache = { ts: Date.now(), data: empty };
+          this.sendSocketNotification("NWS_FORECAST", empty);
+        } else {
+          console.error(`[${this.name}] Forecast fetch error:`, msg);
+        }
       });
   },
 
@@ -160,7 +189,8 @@ module.exports = NodeHelper.create({
     return new Promise((resolve, reject) => {
       const opts = {
         headers: {
-          "User-Agent": "MMM-AmbientWeather/1.0 (MagicMirror)"
+          "User-Agent": "MMM-AmbientWeather/1.0 (MagicMirror)",
+          Accept: "application/geo+json"
         }
       };
       https
@@ -169,7 +199,13 @@ module.exports = NodeHelper.create({
           res.on("data", (chunk) => (data += chunk));
           res.on("end", () => {
             try {
-              resolve(JSON.parse(data));
+              const parsed = JSON.parse(data);
+              const status = res.statusCode || 200;
+              if (status >= 400) {
+                const detail = parsed?.detail || parsed?.title || `HTTP ${status}`;
+                return reject(new Error(detail));
+              }
+              resolve(parsed);
             } catch (err) {
               reject(err);
             }
