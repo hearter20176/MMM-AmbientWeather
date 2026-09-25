@@ -75,6 +75,7 @@ Module.register("MMM-AmbientWeather", {
     this.lastForecastFetch = 0;
     this.latestForecastRenderKey = null;
     this.forecastAnimQueue = [];
+    this.activeForecastIds = [];
 
     this.sendSocketNotification("CONNECT_AMBIENT", {
       apiKey: this.config.apiKey,
@@ -333,6 +334,26 @@ Module.register("MMM-AmbientWeather", {
     });
   },
 
+  _destroyLottie(id) {
+    const inst = this.lottieInstances[id];
+    if (inst && typeof inst.destroy === "function") {
+      try {
+        inst.destroy();
+      } catch (err) {
+        console.warn(`[${this.name}] Failed to destroy lottie ${id}:`, err);
+      }
+    }
+    delete this.lottieInstances[id];
+  },
+
+  _resetForecastAnimations() {
+    if (Array.isArray(this.activeForecastIds)) {
+      this.activeForecastIds.forEach((id) => this._destroyLottie(id));
+    }
+    this.activeForecastIds = [];
+    this.forecastAnimQueue = [];
+  },
+
   _playAnimationWhenReady(
     elementId,
     animationFile,
@@ -340,14 +361,6 @@ Module.register("MMM-AmbientWeather", {
     delay = 200
   ) {
     const el = document.getElementById(elementId);
-    const isForecast = elementId.startsWith("forecast-anim-");
-    if (
-      isForecast &&
-      this.latestForecastRenderKey &&
-      !elementId.includes(this.latestForecastRenderKey)
-    ) {
-      return; // stale render; skip
-    }
     if (!el) {
       if (attempts > 0) {
         setTimeout(
@@ -403,6 +416,9 @@ Module.register("MMM-AmbientWeather", {
   },
 
   getDom() {
+    this._resetForecastAnimations();
+    this._destroyLottie("uv-anim");
+
     const wrapper = document.createElement("div");
     wrapper.className = "MMM-AmbientWeather glass-card raised-edge";
     wrapper.style.minWidth = `${this.config.minWidth}px`;
@@ -454,7 +470,7 @@ Module.register("MMM-AmbientWeather", {
     if (this.config.showUV && d.uv !== undefined) {
       const uvRow = document.createElement("div");
       uvRow.className = "uv-row";
-      const uvAnimId = `uv-anim-${Date.now()}`;
+      const uvAnimId = "uv-anim";
       const uvLabel = document.createElement("span");
       uvLabel.className = "uv-label";
       uvLabel.textContent = "UV Index:";
@@ -572,7 +588,7 @@ Module.register("MMM-AmbientWeather", {
           const phrase = day?.phrase || "";
           const condRaw = day?.cond || this._conditionFromText(phrase);
           const cond = condRaw || "partly_cloudy";
-          const animId = `forecast-anim-${renderKey}-${idx}`;
+          const animId = `forecast-anim-${idx}`;
           forecastAnims.push({ animId, cond, isDay: day?.isDaytime !== false });
           return `
           <div class="forecast-day">
@@ -588,17 +604,17 @@ Module.register("MMM-AmbientWeather", {
         <div class="forecast-grid">${rows}</div>`;
       wrapper.appendChild(fc);
 
+      this.activeForecastIds = forecastAnims.map((f) => f.animId);
+
       setTimeout(() => {
-        const latestKey = this.latestForecastRenderKey;
-        const queue = forecastAnims
-          .filter((f) => `${f.animId}`.includes(latestKey))
-          .map(({ animId, cond, isDay }) => ({
-            id: animId,
-            file: this._resolveAnimationFile(cond, isDay),
-            isDay,
-            attempts: 30,
-            renderKey: latestKey
-          }));
+        if (renderKey !== this.latestForecastRenderKey) return;
+        const queue = forecastAnims.map(({ animId, cond, isDay }) => ({
+          id: animId,
+          file: this._resolveAnimationFile(cond, isDay),
+          isDay,
+          attempts: 30,
+          renderKey
+        }));
         this.forecastAnimQueue = queue;
         if (this.forecastAnimQueue.length) this._processForecastAnimQueue();
       }, 400);
