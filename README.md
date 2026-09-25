@@ -132,6 +132,7 @@ Note: For the weather.gov forecast API, keep `latitude` and `longitude` to 4 dec
 | `animations`       | `object`  | (JSON map)       | Map of weather types to animation filenames.   |
 | `performanceProfile` | `string` | `"auto"`        | `"auto"` detects Pi/ARM to lower motion, `"pi"` forces low-motion, `"full"` keeps all effects. |
 | `reduceMotion`     | `boolean` | `false`          | Force-disable Lottie/motion (also triggered by `prefers-reduced-motion`). |
+| `debug`            | `boolean` | `false`          | Log every realtime payload from the Ambient API (verbose; off by default). |
 
 ## 🌈 Data Displayed
 

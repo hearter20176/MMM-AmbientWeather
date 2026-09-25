@@ -31,21 +31,31 @@ module.exports = NodeHelper.create({
       this.socket = null;
     }
 
-    const { apiKey, applicationKey, macAddress, latitude, longitude } = config;
+    const { apiKey, applicationKey, macAddress, latitude, longitude, debug } = config;
     const FILTER_MAC = macAddress ? macAddress.toLowerCase() : null;
     const SOCKET_URL = `https://rt2.ambientweather.net/?api=1&applicationKey=${applicationKey}`;
 
     console.log(`[${this.name}] Connecting to Ambient Weather Realtime API...`);
-    console.log(`[${this.name}] URL: ${SOCKET_URL}`);
+    console.log(`[${this.name}] URL: ${SOCKET_URL.replace(/applicationKey=[^&]+/, "applicationKey=<masked>")}`);
 
+    // Back off exponentially (5s -> 2min) so an outage doesn't retry every 5s forever.
     const socket = io(SOCKET_URL, {
       transports: ["websocket"],
       reconnection: true,
-      reconnectionDelay: 5000
+      reconnectionDelay: 5000,
+      reconnectionDelayMax: 120000,
+      randomizationFactor: 0.5
     });
+    const ERROR_SUMMARY_MS = 5 * 60 * 1000;
+    let errorCount = 0;
+    let lastErrorLog = 0;
     this.socket = socket;
 
     socket.on("connect", () => {
+      if (errorCount > 0) {
+        console.log(`[${this.name}] Reconnected after ${errorCount} failed attempt(s)`);
+        errorCount = 0;
+      }
       console.log(`[${this.name}] Connected to Ambient Weather Realtime API`);
       socket.emit("subscribe", { apiKeys: [apiKey], applicationKey });
     });
@@ -59,7 +69,7 @@ module.exports = NodeHelper.create({
         const mac = (data.macAddress || data.MACAddress || data.mac || "").toLowerCase();
         if (FILTER_MAC && mac !== FILTER_MAC) return;
 
-        console.log(`[${this.name}] Realtime payload:`, data);
+        if (debug) console.log(`[${this.name}] Realtime payload:`, data);
 
         // Attach computed sunrise/sunset if missing
         if ((!data.sunrise || !data.sunset) && latitude && longitude) {
@@ -83,8 +93,15 @@ module.exports = NodeHelper.create({
       console.warn(`[${this.name}] Disconnected from Ambient API:`, reason);
     });
 
+    // Log the first failure of an outage, then a summary at most every 5 minutes.
     socket.on("connect_error", (err) => {
-      console.error(`[${this.name}] Connection error:`, err.message);
+      errorCount += 1;
+      const now = Date.now();
+      if (errorCount === 1 || now - lastErrorLog >= ERROR_SUMMARY_MS) {
+        const suffix = errorCount > 1 ? ` (${errorCount} failed attempts so far)` : "";
+        console.error(`[${this.name}] Connection error: ${err.message}${suffix}`);
+        lastErrorLog = now;
+      }
     });
 
     socket.on("error", (err) => {

@@ -5,6 +5,7 @@
 
 Module.register("MMM-AmbientWeather", {
   defaults: {
+    debug: false, // log every realtime payload from the Ambient API
     title: "Home Weather",
     units: "imperial",
     updateInterval: 30 * 1000,
@@ -96,7 +97,8 @@ Module.register("MMM-AmbientWeather", {
       macAddress: this.config.macAddress,
       latitude: this.config.latitude,
       longitude: this.config.longitude,
-      forecastCacheMinutes: this.config.forecastCacheMinutes
+      forecastCacheMinutes: this.config.forecastCacheMinutes,
+      debug: this.config.debug
     });
 
     setTimeout(() => {
