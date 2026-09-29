@@ -1,20 +1,25 @@
 /* MagicMirror Module: MMM-AmbientWeather - Node Helper */
 
+const https = require("https");
+const Log = require("logger");
 const NodeHelper = require("node_helper");
 const io = require("socket.io-client");
 const SunCalc = require("suncalc");
-const https = require("https");
+
+const NO_DATA_TIMEOUT_MS = 3 * 60 * 1000; // how long to wait for a matching packet after "subscribed"
+const ERROR_SUMMARY_MS = 5 * 60 * 1000; // how often to re-log/re-notify a sustained connect_error
 
 module.exports = NodeHelper.create({
-  start: function () {
-    console.log(`[${this.name}] Node helper started.`);
+  start() {
+    Log.info(`[${this.name}] Node helper started.`);
     this.socket = null;
     this.lastPayload = null;
     this.config = {};
     this.forecastCache = null;
+    this.noDataTimer = null;
   },
 
-  socketNotificationReceived: function (notification, payload) {
+  socketNotificationReceived(notification, payload) {
     if (notification === "CONNECT_AMBIENT") {
       this.config = payload;
       this.connectAmbient(payload);
@@ -24,19 +29,30 @@ module.exports = NodeHelper.create({
     }
   },
 
-  connectAmbient: function (config) {
+  connectAmbient(config) {
     if (this.socket) {
-      console.log(`[${this.name}] Existing connection closed before reconnect.`);
+      Log.log(`[${this.name}] Existing connection closed before reconnect.`);
       this.socket.disconnect();
       this.socket = null;
     }
+    this._clearNoDataTimer();
 
-    const { apiKey, applicationKey, macAddress, latitude, longitude, debug } = config;
-    const FILTER_MAC = macAddress ? macAddress.toLowerCase() : null;
+    const { apiKey, applicationKey, macAddress, latitude, longitude, debug } = config || {};
+
+    if (!apiKey || !applicationKey) {
+      Log.error(`[${this.name}] Missing apiKey and/or applicationKey in config.`);
+      this.sendSocketNotification("AMBIENT_ERROR", {
+        code: "CONFIG",
+        message: "apiKey and applicationKey are required"
+      });
+      return;
+    }
+
+    // Mutable: if no macAddress is configured, "subscribed" picks the account's first device.
+    let FILTER_MAC = macAddress ? macAddress.toLowerCase() : null;
     const SOCKET_URL = `https://rt2.ambientweather.net/?api=1&applicationKey=${applicationKey}`;
 
-    console.log(`[${this.name}] Connecting to Ambient Weather Realtime API...`);
-    console.log(`[${this.name}] URL: ${SOCKET_URL.replace(/applicationKey=[^&]+/, "applicationKey=<masked>")}`);
+    Log.log(`[${this.name}] Connecting to Ambient Weather Realtime API...`);
 
     // Back off exponentially (5s -> 2min) so an outage doesn't retry every 5s forever.
     const socket = io(SOCKET_URL, {
@@ -46,22 +62,39 @@ module.exports = NodeHelper.create({
       reconnectionDelayMax: 120000,
       randomizationFactor: 0.5
     });
-    const ERROR_SUMMARY_MS = 5 * 60 * 1000;
     let errorCount = 0;
     let lastErrorLog = 0;
     this.socket = socket;
 
     socket.on("connect", () => {
       if (errorCount > 0) {
-        console.log(`[${this.name}] Reconnected after ${errorCount} failed attempt(s)`);
+        Log.log(`[${this.name}] Reconnected after ${errorCount} failed attempt(s)`);
         errorCount = 0;
       }
-      console.log(`[${this.name}] Connected to Ambient Weather Realtime API`);
+      Log.log(`[${this.name}] Connected to Ambient Weather Realtime API`);
       socket.emit("subscribe", { apiKeys: [apiKey], applicationKey });
     });
 
     socket.on("subscribed", (data) => {
-      console.log(`[${this.name}] Subscribed to realtime feed:`, data);
+      const devices = Array.isArray(data?.devices) ? data.devices : [];
+      Log.log(`[${this.name}] Subscribed to realtime feed (${devices.length} device(s))`);
+
+      // The Ambient realtime API answers a subscribe with bad/unknown keys with an empty device
+      // list instead of a socket-level error - without this check the card spins forever.
+      if (!devices.length) {
+        this.sendSocketNotification("AMBIENT_ERROR", {
+          code: "AUTH",
+          message: "Ambient API key returned no devices. Check apiKey/applicationKey."
+        });
+        return;
+      }
+
+      if (!FILTER_MAC) {
+        const firstMac = devices[0]?.macAddress || devices[0]?.mac;
+        if (firstMac) FILTER_MAC = `${firstMac}`.toLowerCase();
+      }
+
+      this._armNoDataTimer(FILTER_MAC);
     });
 
     socket.on("data", (data) => {
@@ -69,7 +102,9 @@ module.exports = NodeHelper.create({
         const mac = (data.macAddress || data.MACAddress || data.mac || "").toLowerCase();
         if (FILTER_MAC && mac !== FILTER_MAC) return;
 
-        if (debug) console.log(`[${this.name}] Realtime payload:`, data);
+        this._clearNoDataTimer();
+
+        if (debug) Log.log(`[${this.name}] Realtime payload:`, data);
 
         // Attach computed sunrise/sunset if missing
         if ((!data.sunrise || !data.sunset) && latitude && longitude) {
@@ -78,38 +113,64 @@ module.exports = NodeHelper.create({
             data.sunrise = times.sunrise.toISOString();
             data.sunset = times.sunset.toISOString();
           } catch (err) {
-            console.warn(`[${this.name}] Unable to compute sunrise/sunset:`, err.message);
+            Log.warn(`[${this.name}] Unable to compute sunrise/sunset:`, err.message);
           }
         }
 
         this.lastPayload = data;
         this.sendSocketNotification("AMBIENT_DATA", { lastData: data });
       } catch (err) {
-        console.error(`[${this.name}] Error processing data:`, err);
+        Log.error(`[${this.name}] Error processing data:`, err);
       }
     });
 
     socket.on("disconnect", (reason) => {
-      console.warn(`[${this.name}] Disconnected from Ambient API:`, reason);
+      Log.warn(`[${this.name}] Disconnected from Ambient API:`, reason);
     });
 
-    // Log the first failure of an outage, then a summary at most every 5 minutes.
+    // Notify the front end on the first failure of an outage, then at most every 5 minutes.
     socket.on("connect_error", (err) => {
       errorCount += 1;
       const now = Date.now();
       if (errorCount === 1 || now - lastErrorLog >= ERROR_SUMMARY_MS) {
         const suffix = errorCount > 1 ? ` (${errorCount} failed attempts so far)` : "";
-        console.error(`[${this.name}] Connection error: ${err.message}${suffix}`);
+        Log.error(`[${this.name}] Connection error: ${err.message}${suffix}`);
         lastErrorLog = now;
+        this.sendSocketNotification("AMBIENT_ERROR", {
+          code: "CONNECT",
+          message: err?.message || "Connection error"
+        });
       }
     });
 
     socket.on("error", (err) => {
-      console.error(`[${this.name}] Socket error:`, err);
+      Log.error(`[${this.name}] Socket error:`, err);
     });
   },
 
-  fetchNwsForecast: function (opts = {}) {
+  // Starts (or restarts) the "did we ever hear a matching packet" watchdog. Fires once if no
+  // packet arrives within NO_DATA_TIMEOUT_MS of a successful subscribe - this is what surfaces a
+  // wrong/typo'd macAddress (or a station that's simply offline) instead of leaving the front end
+  // loading forever. Armed regardless of whether a macAddress filter is configured.
+  _armNoDataTimer(filterMac) {
+    this._clearNoDataTimer();
+    this.noDataTimer = setTimeout(() => {
+      const message = filterMac
+        ? `No data received for macAddress ending in ${filterMac.slice(-5)}`
+        : "No data received from the Ambient Weather account";
+      this.sendSocketNotification("AMBIENT_ERROR", { code: "NO_DATA", message });
+    }, NO_DATA_TIMEOUT_MS);
+    if (this.noDataTimer.unref) this.noDataTimer.unref();
+  },
+
+  _clearNoDataTimer() {
+    if (this.noDataTimer) {
+      clearTimeout(this.noDataTimer);
+      this.noDataTimer = null;
+    }
+  },
+
+  fetchNwsForecast(opts = {}) {
     const { lat, lon, metric, days } = opts;
     if (lat === undefined || lon === undefined) return;
     const cacheMs = (this.config.forecastCacheMinutes || 90) * 60 * 1000;
@@ -134,10 +195,8 @@ module.exports = NodeHelper.create({
 
         if (!forecastUrl) {
           const detail = points?.detail || points?.title || "unknown response";
-          console.warn(
-            `[${this.name}] No forecast URL from weather.gov. Detail: ${detail}`
-          );
-          const empty = { forecast: [] };
+          Log.warn(`[${this.name}] No forecast URL from weather.gov. Detail: ${detail}`);
+          const empty = { forecast: [], tonight: null };
           this.forecastCache = { ts: Date.now(), data: empty };
           this.sendSocketNotification("NWS_FORECAST", empty);
           return null;
@@ -149,7 +208,7 @@ module.exports = NodeHelper.create({
         if (!json) return;
         const periods = Array.isArray(json?.properties?.periods) ? json.properties.periods : [];
         const daysOnly = periods.filter((p) => p.isDaytime).slice(0, limit);
-        const forecast = daysOnly.map((p, idx) => {
+        const forecast = daysOnly.map((p) => {
           const night = periods.find((n) => !n.isDaytime && new Date(n.startTime).getTime() > new Date(p.startTime).getTime());
           const toMetric = (tempF) => (tempF - 32) * 5 / 9;
           const hiF = p.temperature !== undefined ? p.temperature : null;
@@ -166,26 +225,42 @@ module.exports = NodeHelper.create({
             isDaytime: p.isDaytime
           };
         });
-        this.forecastCache = { ts: Date.now(), data: { forecast, metric } };
-        this.sendSocketNotification("NWS_FORECAST", { forecast });
+
+        // Distinct from forecast[0] (the next/current daytime period): the current or next
+        // night-time period, used by the front end as its night fallback instead of tomorrow's
+        // daytime forecast.
+        const now = Date.now();
+        const tonightPeriod = periods.find((p) => !p.isDaytime && new Date(p.endTime).getTime() > now);
+        const tonight = tonightPeriod
+          ? {
+              cond: this._conditionFromText(tonightPeriod.shortForecast || tonightPeriod.name) || null,
+              phrase: tonightPeriod.shortForecast || tonightPeriod.name || ""
+            }
+          : null;
+
+        this.forecastCache = { ts: Date.now(), data: { forecast, tonight, metric } };
+        this.sendSocketNotification("NWS_FORECAST", { forecast, tonight });
       })
       .catch((err) => {
         const msg = err?.message || `${err}`;
         const isInvalidPoint = /invalidpoint|data unavailable|no forecast url/i.test(msg);
         if (isInvalidPoint) {
-          console.warn(
-            `[${this.name}] Forecast unavailable for lat/lon ${lat},${lon}: ${msg}`
-          );
-          const empty = { forecast: [] };
+          Log.warn(`[${this.name}] Forecast unavailable for lat/lon ${lat},${lon}: ${msg}`);
+          const empty = { forecast: [], tonight: null };
           this.forecastCache = { ts: Date.now(), data: empty };
           this.sendSocketNotification("NWS_FORECAST", empty);
         } else {
-          console.error(`[${this.name}] Forecast fetch error:`, msg);
+          Log.error(`[${this.name}] Forecast fetch error:`, msg);
+          // Don't leave the front end's forecast panel stuck on an old render forever - hand back
+          // whatever we still have cached (or nothing) plus an error flag so it can retry sooner.
+          const fallback = this.forecastCache ? this.forecastCache.data.forecast : [];
+          const tonightFallback = this.forecastCache ? this.forecastCache.data.tonight : null;
+          this.sendSocketNotification("NWS_FORECAST", { forecast: fallback || [], tonight: tonightFallback, error: msg });
         }
       });
   },
 
-  _conditionFromText: function (txt) {
+  _conditionFromText(txt) {
     if (!txt) return null;
     const t = `${txt}`.toLowerCase();
     if (t.includes("thunder")) return "thunderstorm";
@@ -202,7 +277,7 @@ module.exports = NodeHelper.create({
     return null;
   },
 
-  _fetchJson: function (url) {
+  _fetchJson(url) {
     return new Promise((resolve, reject) => {
       const opts = {
         headers: {
@@ -210,7 +285,7 @@ module.exports = NodeHelper.create({
           Accept: "application/geo+json"
         }
       };
-      https
+      const req = https
         .get(url, opts, (res) => {
           let data = "";
           res.on("data", (chunk) => (data += chunk));
@@ -220,7 +295,8 @@ module.exports = NodeHelper.create({
               const status = res.statusCode || 200;
               if (status >= 400) {
                 const detail = parsed?.detail || parsed?.title || `HTTP ${status}`;
-                return reject(new Error(detail));
+                reject(new Error(detail));
+                return;
               }
               resolve(parsed);
             } catch (err) {
@@ -229,6 +305,9 @@ module.exports = NodeHelper.create({
           });
         })
         .on("error", reject);
+      req.setTimeout(15000, () => {
+        req.destroy(new Error("Request timed out"));
+      });
     });
   }
 });
