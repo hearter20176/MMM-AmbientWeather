@@ -14,6 +14,7 @@ Module.register("MMM-AmbientWeather", {
     performanceProfile: "auto", // auto | pi | full
     reduceMotion: false,
     minWidth: 260,
+    maxHeight: null, // optional card height cap in px; null sizes the card to its content
     showSunTimes: true,
     showUV: true,
     showBarometer: true,
@@ -77,15 +78,16 @@ Module.register("MMM-AmbientWeather", {
     this.lastUpdate = null;
     this.offline = false;
     this.isDomReady = false;
-    this.lottieInstances = {};
+    this.lottieInstances = []; // every live Lottie player this module owns
+    this.pendingAnims = []; // containers from the latest getDom() awaiting a player
+    this.renderGen = 0; // bumped on every getDom(); invalidates timers from older renders
+    this.animTimer = null;
+    this.suspended = false;
     this.lastPressure = null;
     this.pressureTrend = null;
     this.forecast = [];
     this.tonight = null;
     this.lastForecastFetch = 0;
-    this.latestForecastRenderKey = null;
-    this.forecastAnimQueue = [];
-    this.activeForecastIds = [];
     this.performanceProfile = this._resolvePerformanceProfile();
     this.reduceMotion =
       this.config.reduceMotion === true ||
@@ -120,6 +122,10 @@ Module.register("MMM-AmbientWeather", {
       this.isDomReady = true;
       if (this.loaded || this.error) this.safeUpdateDom(0);
     }
+    // MagicMirror sends this to the module after every updateDom() resolves (swapped or skipped),
+    // so it is the deterministic moment to reap the outgoing tree and bind the new containers.
+    // The bounded poll in _startAnimations() is only a fallback.
+    if (notification === "MODULE_DOM_UPDATED") this._startAnimations();
   },
 
   socketNotificationReceived(notification, payload) {
@@ -442,68 +448,131 @@ Module.register("MMM-AmbientWeather", {
     });
   },
 
-  _playAnimationFor(elementId, animationFile) {
-    if (!this.enableLottie || !animationFile) return;
-    const el = document.getElementById(elementId);
-    if (!el) return;
-    const path = this.file(`animations/${animationFile}`);
-    if (this.lottieInstances[elementId])
-      this.lottieInstances[elementId].destroy();
-    this.lottieInstances[elementId] = lottie.loadAnimation({
-      container: el,
-      renderer: "svg",
-      loop: true,
-      autoplay: true,
-      path
+  // ---- Lottie lifecycle -------------------------------------------------------------------
+  //
+  // getDom() builds a brand-new DOM tree on every render while MagicMirror keeps the previous
+  // tree attached for the fade-out, and MagicMirror may even skip the swap entirely when the new
+  // markup equals the old. So containers are never looked up by id, and players from the previous
+  // render are NOT destroyed in getDom(): they keep running on the visible tree until their
+  // container is actually detached, at which point _startAnimations() reaps them. Each render
+  // registers the exact container elements it created (this.pendingAnims); a player is created
+  // only once such a container is connected. renderGen invalidates timers from older renders.
+  // this.lottieInstances holds { player, container } for every live player.
+
+  _clearAnimTimer() {
+    if (this.animTimer) {
+      clearTimeout(this.animTimer);
+      this.animTimer = null;
+    }
+  },
+
+  _destroyPlayer(entry) {
+    try {
+      entry.player.destroy();
+    } catch (err) {
+      Log.warn(`[${this.name}] Failed to destroy lottie player:`, err);
+    }
+  },
+
+  // Destroys players whose container is no longer in the document (the swapped-out tree).
+  _reapDetachedAnimations() {
+    this.lottieInstances = (this.lottieInstances || []).filter((entry) => {
+      if (entry.container.isConnected) return true;
+      this._destroyPlayer(entry);
+      return false;
     });
   },
 
-  _destroyLottie(id) {
-    const inst = this.lottieInstances[id];
-    if (inst && typeof inst.destroy === "function") {
+  // Starts a new render generation: drops the previous registrations and timer. Live players are
+  // left alone (see above).
+  _beginRender() {
+    this.renderGen = (this.renderGen || 0) + 1;
+    this._clearAnimTimer();
+    this.pendingAnims = [];
+  },
+
+  // Registers a container created by the current getDom() pass; the player starts later.
+  _registerAnimation(container, animationFile) {
+    if (!this.enableLottie || !animationFile || !container) return;
+    this.pendingAnims.push({ container, file: animationFile, player: null });
+  },
+
+  // Creates players for registered containers that are now attached to the document and reaps
+  // players on detached containers. Items whose container is not attached yet (new DOM still
+  // waiting for the old DOM to fade out) are retried on a short timer, bounded by `attempts`.
+  // Players are only created/resumed while the module is not suspended.
+  _startAnimations(attempts = 50) {
+    this._clearAnimTimer();
+    if (!this.enableLottie) return;
+    this._reapDetachedAnimations();
+    // MM sets hidden=false when a show starts but calls resume() only when its fade ends; a
+    // data render inside that window clears MM's shared timer and resume() never comes. A
+    // module that MM reports visible is not suspended.
+    if (this.suspended && this.hidden === false) this.suspended = false;
+    if (this.suspended) return;
+    const gen = this.renderGen;
+    let waiting = false;
+    this.pendingAnims.forEach((item) => {
+      if (item.player) return;
+      if (!item.container.isConnected) {
+        waiting = true;
+        return;
+      }
+      let player;
       try {
-        inst.destroy();
+        player = lottie.loadAnimation({
+          container: item.container,
+          renderer: "svg",
+          loop: true,
+          autoplay: true,
+          path: this.file(`animations/${item.file}`)
+        });
       } catch (err) {
-        Log.warn(`[${this.name}] Failed to destroy lottie ${id}:`, err);
+        Log.warn(`[${this.name}] Failed to start lottie animation ${item.file}:`, err);
+        item.player = { destroy() {}, play() {}, pause() {} }; // do not retry a failing file
+        return;
       }
+      item.player = player;
+      this.lottieInstances.push({ player, container: item.container });
+    });
+    // Every surviving player is on a connected container (detached ones were reaped above), so
+    // play all of them, including previous-render players left on screen by a skipped/dropped
+    // swap while the module was suspended.
+    this.lottieInstances.forEach((entry) => {
+      if (typeof entry.player.play === "function") entry.player.play();
+    });
+    // Players from a previous render that is still attached are reaped once it is swapped out.
+    const staleLeft = this.lottieInstances.some(
+      (entry) => !this.pendingAnims.some((item) => item.player === entry.player)
+    );
+    if ((waiting || staleLeft) && attempts > 0) {
+      this.animTimer = setTimeout(() => {
+        this.animTimer = null;
+        if (gen !== this.renderGen) return;
+        this._startAnimations(attempts - 1);
+      }, 100);
+    } else if (waiting && !this.lottieInstances.length) {
+      // Not a failure while the previous tree is still live with players (swap skipped/dropped).
+      Log.warn(`[${this.name}] Gave up waiting for weather icon containers to attach`);
     }
-    delete this.lottieInstances[id];
   },
 
-  _resetForecastAnimations() {
-    if (Array.isArray(this.activeForecastIds)) {
-      this.activeForecastIds.forEach((id) => this._destroyLottie(id));
-    }
-    this.activeForecastIds = [];
-    this.forecastAnimQueue = [];
+  _pauseAnimations() {
+    this._clearAnimTimer();
+    (this.lottieInstances || []).forEach((entry) => {
+      if (typeof entry.player.pause === "function") entry.player.pause();
+    });
   },
 
-  _playAnimationWhenReady(
-    elementId,
-    animationFile,
-    attempts = 20,
-    delay = 200
-  ) {
-    if (!this.enableLottie || !animationFile) return;
-    const el = document.getElementById(elementId);
-    if (!el) {
-      if (attempts > 0) {
-        setTimeout(
-          () =>
-            this._playAnimationWhenReady(
-              elementId,
-              animationFile,
-              attempts - 1,
-              delay
-            ),
-          delay
-        );
-      } else {
-        Log.warn(`[${this.name}] Missing icon container after retries: ${elementId}`);
-      }
-      return;
-    }
-    this._playAnimationFor(elementId, animationFile);
+  // Called by MagicMirror when the module is hidden (e.g. MMM-pages rotation).
+  suspend() {
+    this.suspended = true;
+    this._pauseAnimations();
+  },
+
+  resume() {
+    this.suspended = false;
+    this._startAnimations();
   },
 
   _uvAnimationFile(uvValue) {
@@ -536,37 +605,16 @@ Module.register("MMM-AmbientWeather", {
     return this.config.animateIcons && !forceReduce;
   },
 
-  _processForecastAnimQueue() {
-    if (!this.forecastAnimQueue.length) return;
-    const next = [];
-    this.forecastAnimQueue.forEach((item) => {
-      const { id, file, renderKey } = item;
-      if (
-        this.latestForecastRenderKey &&
-        renderKey !== this.latestForecastRenderKey
-      )
-        return; // stale
-      const el = document.getElementById(id);
-      if (el) {
-        this._playAnimationFor(id, file);
-      } else if (item.attempts > 0) {
-        next.push({ ...item, attempts: item.attempts - 1 });
-      } else {
-        Log.warn(`[${this.name}] Missing forecast icon container after retries: ${id}`);
-      }
-    });
-    this.forecastAnimQueue = next;
-    if (this.forecastAnimQueue.length)
-      setTimeout(() => this._processForecastAnimQueue(), 200);
-  },
-
   getDom() {
-    this._resetForecastAnimations();
-    this._destroyLottie(`${this.identifier}-uv-anim`);
+    // New render generation; old players stay alive until their (visible) tree is swapped out.
+    this._beginRender();
 
     const wrapper = document.createElement("div");
     wrapper.className = "MMM-AmbientWeather glass-card raised-edge";
     wrapper.style.minWidth = `${this.config.minWidth}px`;
+    if (Number(this.config.maxHeight) > 0) {
+      wrapper.style.setProperty("--aw-max-height", `${Number(this.config.maxHeight)}px`);
+    }
     if (this.offline) wrapper.classList.add("offline");
 
     if (this.config.title) {
@@ -589,6 +637,7 @@ Module.register("MMM-AmbientWeather", {
       errDiv.appendChild(icon);
       errDiv.appendChild(msg);
       wrapper.appendChild(errDiv);
+      this._startAnimations(); // reaps players left on the outgoing tree
       return wrapper;
     }
 
@@ -603,6 +652,7 @@ Module.register("MMM-AmbientWeather", {
       loading.appendChild(spinner);
       loading.appendChild(text);
       wrapper.appendChild(loading);
+      this._startAnimations();
       return wrapper;
     }
 
@@ -637,9 +687,8 @@ Module.register("MMM-AmbientWeather", {
     // Left: Animation
     const left = document.createElement("div");
     left.className = "main-left";
-    const animId = `${this.identifier}-anim-weather`;
     const animDiv = document.createElement("div");
-    animDiv.id = animId;
+    animDiv.id = `${this.identifier}-anim-weather`;
     animDiv.className = "anim-container";
     left.appendChild(animDiv);
     if (!this.enableLottie) {
@@ -652,12 +701,11 @@ Module.register("MMM-AmbientWeather", {
     if (this.config.showUV && d.uv !== undefined) {
       const uvRow = document.createElement("div");
       uvRow.className = "uv-row";
-      const uvAnimId = `${this.identifier}-uv-anim`;
       const uvLabel = document.createElement("span");
       uvLabel.className = "uv-label";
       uvLabel.textContent = "UV Index:";
       const uvIcon = document.createElement("div");
-      uvIcon.id = uvAnimId;
+      uvIcon.id = `${this.identifier}-uv-anim`;
       uvIcon.className = "uv-icon";
       uvRow.appendChild(uvLabel);
       uvRow.appendChild(uvIcon);
@@ -666,7 +714,7 @@ Module.register("MMM-AmbientWeather", {
       if (this.enableLottie) {
         const uvFile = this._uvAnimationFile(d.uv);
         if (uvFile) {
-          setTimeout(() => this._playAnimationWhenReady(uvAnimId, uvFile), 200);
+          this._registerAnimation(uvIcon, uvFile);
         }
       } else {
         // No Lottie: fall back to a plain numeric UV value instead of an empty icon box.
@@ -756,62 +804,61 @@ Module.register("MMM-AmbientWeather", {
     if (this.config.showNwsForecast && forecastItems.length) {
       const fc = document.createElement("div");
       fc.className = "forecast";
-      const renderKey = Date.now().toString();
-      this.latestForecastRenderKey = renderKey;
-      const forecastAnims = [];
-      const rows = forecastItems
-        .map((day, idx) => {
-          const dayName = day?.date
-            ? new Date(day.date).toLocaleDateString([], { weekday: "short" })
-            : "";
-          const hi =
-            day?.high !== undefined && day?.high !== null
-              ? day.high.toFixed(0)
-              : "-";
-          const lo =
-            day?.low !== undefined && day?.low !== null
-              ? day.low.toFixed(0)
-              : "-";
-          const phrase = day?.phrase || "";
-          // node_helper already derives `cond` from the NWS phrase for every forecast item.
-          const dayCond = day?.cond || "partly_cloudy";
-          const dayIsDay = day?.isDaytime !== false;
-          const animId = `${this.identifier}-forecast-anim-${idx}`;
-          let iconHtml = "";
-          if (this.enableLottie) {
-            forecastAnims.push({ animId, cond: dayCond, isDay: dayIsDay });
-          } else {
-            iconHtml = `<i class="fa ${this._staticIconClass(dayCond, dayIsDay)} forecast-static-icon"></i>`;
-          }
-          return `
-          <div class="forecast-day">
-            <div class="forecast-name">${this._esc(dayName)}</div>
-            <div class="forecast-temps"><span class="hi">${hi}&deg;</span><span class="lo">${lo}&deg;</span></div>
-            <div class="forecast-icon" id="${animId}">${iconHtml}</div>
-            <div class="forecast-text">${this._esc(phrase)}</div>
-          </div>`;
-        })
-        .join("");
-      fc.innerHTML = `
-        <div class="forecast-title">${forecastLimit}-Day Forecast</div>
-        <div class="forecast-grid">${rows}</div>`;
+      const fcTitle = document.createElement("div");
+      fcTitle.className = "forecast-title";
+      fcTitle.textContent = `${forecastLimit}-Day Forecast`;
+      const grid = document.createElement("div");
+      grid.className = "forecast-grid";
+      forecastItems.forEach((day, idx) => {
+        const dayName = day?.date
+          ? new Date(day.date).toLocaleDateString([], { weekday: "short" })
+          : "";
+        const hi =
+          typeof day?.high === "number" ? day.high.toFixed(0) : "-";
+        const lo =
+          typeof day?.low === "number" ? day.low.toFixed(0) : "-";
+        const phrase = day?.phrase || "";
+        // node_helper already derives `cond` from the NWS phrase for every forecast item.
+        const dayCond = day?.cond || "partly_cloudy";
+        const dayIsDay = day?.isDaytime !== false;
+
+        const dayEl = document.createElement("div");
+        dayEl.className = "forecast-day";
+        const nameEl = document.createElement("div");
+        nameEl.className = "forecast-name";
+        nameEl.textContent = dayName;
+        const tempsEl = document.createElement("div");
+        tempsEl.className = "forecast-temps";
+        const hiEl = document.createElement("span");
+        hiEl.className = "hi";
+        hiEl.textContent = `${hi}°`;
+        const loEl = document.createElement("span");
+        loEl.className = "lo";
+        loEl.textContent = `${lo}°`;
+        tempsEl.appendChild(hiEl);
+        tempsEl.appendChild(loEl);
+        const iconEl = document.createElement("div");
+        iconEl.className = "forecast-icon";
+        iconEl.id = `${this.identifier}-forecast-anim-${idx}`;
+        if (this.enableLottie) {
+          this._registerAnimation(iconEl, this._resolveAnimationFile(dayCond, dayIsDay));
+        } else {
+          const staticIcon = document.createElement("i");
+          staticIcon.className = `fa ${this._staticIconClass(dayCond, dayIsDay)} forecast-static-icon`;
+          iconEl.appendChild(staticIcon);
+        }
+        const textEl = document.createElement("div");
+        textEl.className = "forecast-text";
+        textEl.textContent = phrase;
+        dayEl.appendChild(nameEl);
+        dayEl.appendChild(tempsEl);
+        dayEl.appendChild(iconEl);
+        dayEl.appendChild(textEl);
+        grid.appendChild(dayEl);
+      });
+      fc.appendChild(fcTitle);
+      fc.appendChild(grid);
       wrapper.appendChild(fc);
-
-      this.activeForecastIds = forecastAnims.map((f) => f.animId);
-
-      setTimeout(() => {
-        if (!this.enableLottie || !forecastAnims.length) return;
-        if (renderKey !== this.latestForecastRenderKey) return;
-        const queue = forecastAnims.map(({ animId, cond: fCond, isDay: fIsDay }) => ({
-          id: animId,
-          file: this._resolveAnimationFile(fCond, fIsDay),
-          isDay: fIsDay,
-          attempts: 30,
-          renderKey
-        }));
-        this.forecastAnimQueue = queue;
-        if (this.forecastAnimQueue.length) this._processForecastAnimQueue();
-      }, 400);
     }
 
     // Footer (offline/last update)
@@ -828,17 +875,15 @@ Module.register("MMM-AmbientWeather", {
       : `<span>Updated: ${last}</span>`;
     wrapper.appendChild(footer);
 
-    // Animate the weather icon
-    setTimeout(() => {
-      const animFile = this._resolveAnimationFile(cond, isDay);
-      if (this.enableLottie && animFile) {
-        this._playAnimationWhenReady(animId, animFile);
-      } else if (this.enableLottie) {
-        const fallback =
-          this.config.animations?.default?.[isDay ? "day" : "night"];
-        if (fallback) this._playAnimationWhenReady(animId, fallback);
-      }
-    }, 300);
+    // Main weather icon: bound to the exact container created above, not looked up by id.
+    if (this.enableLottie) {
+      const animFile =
+        this._resolveAnimationFile(cond, isDay) ||
+        this.config.animations?.default?.[isDay ? "day" : "night"];
+      this._registerAnimation(animDiv, animFile);
+      // Players start once MagicMirror has attached this tree (container.isConnected).
+      this._startAnimations();
+    }
 
     return wrapper;
   }

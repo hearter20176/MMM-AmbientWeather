@@ -76,7 +76,8 @@ Add the following to your `config/config.js`:
     animateIcons: true,
     performanceProfile: "auto",  // "auto" | "pi" | "full"
     reduceMotion: false,         // true disables Lottie on low-power or reduced-motion setups
-    minWidth: 260
+    minWidth: 260,
+    maxHeight: null              // optional card height cap in px; null = size to content
   }
 }
 ```
@@ -108,11 +109,25 @@ fewer. More precision can cause the API to reject the request.
 | `performanceProfile`     | `string`  | `"auto"`         | `"auto"` detects Pi/ARM devices and disables Lottie for them, `"pi"` forces it off, `"full"` keeps it on. |
 | `reduceMotion`           | `boolean` | `false`          | Force-disable Lottie/motion (also triggered by `prefers-reduced-motion`).                           |
 | `minWidth`               | `int`     | `260`            | Minimum card width in pixels.                                                                       |
+| `maxHeight`              | `int`     | `null`           | Optional card height cap in pixels. `null` sizes the card to its content (nothing is clipped).      |
 | `debug`                  | `boolean` | `false`          | Log every realtime payload from the Ambient API to the browser console (verbose; off by default).  |
 
 When `animateIcons` is off (directly, via `reduceMotion`, or because `performanceProfile` resolved
 to `"pi"`), the module falls back to static Font Awesome icons for the main condition and each
 forecast day, and shows the UV Index as a plain number instead of an animated icon.
+
+Animation lifecycle: every Lottie player is bound to the exact container created for its render.
+Players from the previous render keep running on the visible tree and are destroyed as soon as
+that tree is detached. The module detects this on MagicMirror's `MODULE_DOM_UPDATED`
+notification, with a short bounded poll as a fallback; if MagicMirror skips or drops the swap the
+existing players simply stay on screen. At most one player exists per container. While the module
+is hidden (for example by MMM-pages), `suspend()` pauses all players and `resume()` plays every
+surviving player again (and starts any that are missing).
+The card height is automatic, and the height override in the module CSS applies only to this
+module's own card (`.MMM-AmbientWeather.glass-card`); other modules are not affected. If a
+`custom.css` rule sets a fixed `height`/`max-height` on this card it is overridden; use the
+`maxHeight` option to cap the height instead. Any stale clamp on other modules' cards should be
+fixed in that module or in `custom.css`.
 
 ## Data Displayed
 

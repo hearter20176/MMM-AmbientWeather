@@ -5,7 +5,7 @@
 .MMM-AmbientWeather {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   color: var(--mm-text, #e9edf5);
   transition: opacity 0.6s ease, filter 0.6s ease;
   font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", -apple-system, system-ui, sans-serif;
@@ -74,6 +74,15 @@ body.mm-day .aw-error-text {
   color: #e9edf5;
   min-width: 260px;
   max-width: 380px;
+}
+
+.MMM-AmbientWeather.glass-card {
+  /* Size to content: a fixed/clamped height (or vertical centering inside one) clips equal
+     amounts off the top and bottom. Cap only via the optional maxHeight config option.
+     Scoped to this module so other glass-card modules are untouched. */
+  height: auto !important;
+  max-height: var(--aw-max-height, none) !important;
+  justify-content: flex-start;
 }
 
 .glass-card > * {
