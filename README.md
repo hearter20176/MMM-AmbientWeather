@@ -5,9 +5,12 @@ weather icons (with a static icon fallback for low-power devices), and realtime 
 the Ambient Weather Realtime API.
 
 <p align="center">
-  <img src="docs/MMM-AmbientWeather_loading_spinner.png" width="400" alt="Loading state"/>
-  <img src="docs/MMM-AmbientWeather_night.png" width="400" alt="Night view"/>
+  <img src="docs/screenshot.png" width="360" alt="MMM-AmbientWeather card in the night theme"/>
+  <img src="docs/MMM-AmbientWeather_loading_spinner.png" width="360" alt="Loading state"/>
 </p>
+
+*Left: live station data with animated icons, the lightning row and "LIGHTNING NEARBY" badge
+(sample lightning readings), and the 3-day NWS forecast. Right: the loading state.*
 
 ## Features
 
