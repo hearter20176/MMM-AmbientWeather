@@ -16,7 +16,9 @@ the Ambient Weather Realtime API.
   fallback when animation is disabled (e.g. on `performanceProfile: "pi"`)
 - Temperature, feels-like, humidity, windspeed + direction, indoor temperature/humidity
 - Rotating weathervane with compass text (N, NNE, NE, ...)
-- Rain and lightning detection badges (based on station data)
+- Rain detection badge (based on station data)
+- Lightning: a page-wide alert when the station's lightning sensor reports a new strike, and a
+  lightning row on the card (strikes today and in the last hour, last strike time and distance)
 - Sunrise and sunset times (computed automatically via SunCalc when the station doesn't report them)
 - UV Index, shown as an animated icon or a plain number when Lottie is disabled
 - 3-day (configurable) National Weather Service forecast panel
@@ -111,6 +113,13 @@ fewer. More precision can cause the API to reject the request.
 | `minWidth`               | `int`     | `260`            | Minimum card width in pixels.                                                                       |
 | `maxHeight`              | `int`     | `null`           | Optional card height cap in pixels. `null` sizes the card to its content (nothing is clipped).      |
 | `debug`                  | `boolean` | `false`          | Log every realtime payload from the Ambient API to the browser console (verbose; off by default).  |
+| `showLightning`          | `string`  | `"always"`       | Lightning row on the card: `"always"`, `"auto"` (only on days with strikes), or `"never"`. `true`/`false` mean always/never. |
+| `lightningAlert`         | `boolean` | `true`           | Show the page-wide banner when the sensor reports a new strike.                                     |
+| `lightningAlertDuration` | `int`     | `60`             | Seconds the banner stays up. Each new strike while it is up refreshes it and restarts the timer. Minimum 5. |
+| `lightningAlertCooldown` | `int`     | `10`             | Minutes after the banner closes before another strike reopens it. `0` disables the cooldown.        |
+| `lightningActiveMinutes` | `int`     | `30`             | Minutes after the last strike that the card treats lightning as active (highlighted row and badge). |
+| `lightningDangerDistance`| `float`   | `6`              | Strikes this close (miles, or km when `units` is metric) use the urgent banner. `0` disables it. See Lightning for the cooldown rule. |
+| `lightningAlertPosition` | `string`  | `"bottom"`       | Banner position: `"bottom"` or `"top"` of the screen.                                            |
 
 When `animateIcons` is off (directly, via `reduceMotion`, or because `performanceProfile` resolved
 to `"pi"`), the module falls back to static Font Awesome icons for the main condition and each
@@ -129,6 +138,40 @@ module's own card (`.MMM-AmbientWeather.glass-card`); other modules are not affe
 `maxHeight` option to cap the height instead. Any stale clamp on other modules' cards should be
 fixed in that module or in `custom.css`.
 
+## Lightning
+
+For stations with a lightning sensor (Ambient fields `lightning_day`, `lightning_hour`,
+`lightning_time`, `lightning_distance`):
+
+- **Strike detection.** A new strike is a rise in `lightning_day` or a newer `lightning_time` than
+  the previous realtime packet. The first packet after MagicMirror starts only sets the baseline,
+  so a restart never re-announces an old strike. The midnight reset of `lightning_day` is not a
+  strike. A `lightning_time` that advances to a value already older than
+  `lightningActiveMinutes` (strikes missed during a connection gap) is ignored, including when
+  the day count rose during the gap; a day-count rise with an
+  unchanged timestamp still counts, reported without a time. Ages are measured on the station's
+  clock (the packet's `dateutc`, which Ambient sends with every packet), so a station clock that
+  runs ahead of or behind the mirror does not drop strikes. A `lightning_time` more than 15
+  minutes ahead of that clock is treated as corrupt: it is ignored, and only a day-count rise can
+  report a strike from that packet.
+- **Banner.** A glass banner with the distance, time, and strikes in the last hour. It is attached
+  to the page body rather than the card, so it appears on every MMM-pages page, not only the
+  weather page. While it is up, new strikes update it in place, and once it is urgent (red,
+  "Lightning strike nearby") it stays urgent until it closes. After it closes, further strikes
+  within `lightningAlertCooldown` do not reopen it. The exception is a strike within
+  `lightningDangerDistance` when the previous banner was not urgent: that opens the urgent banner
+  straight away. The banner enters and leaves with one short transition and never loops; with
+  `reduceMotion` or the `"pi"` profile (or the OS reduced-motion setting) it appears and
+  disappears without motion and without the backdrop blur.
+- **Card.** A lightning row under the other readings: strikes today and in the last hour, plus the
+  last strike's time and distance ("No strikes logged" until the sensor has recorded one). It is
+  highlighted, and a "LIGHTNING NEARBY" badge shows, for `lightningActiveMinutes` (30 by default,
+  after the 30-30 rule) after the last strike. The badges pulse a few times when they appear and
+  then stay still.
+- **Options.** Invalid lightning options are logged as a warning and replaced by their defaults.
+- **Notification.** Every detected strike is broadcast as `AMBIENT_LIGHTNING`
+  `{ time, distance, unit, strikesHour, strikesDay }`, banner or not, for other modules to use.
+
 ## Data Displayed
 
 - Temperature (deg F/C) and feels-like
@@ -138,7 +181,7 @@ fixed in that module or in `custom.css`.
 - Barometric pressure and trend
 - UV Index (0-11)
 - Sunrise / sunset
-- Rain and lightning detection badges
+- Rain detection badge; lightning row and "LIGHTNING NEARBY" badge (see Lightning)
 - National Weather Service forecast (when `showNwsForecast` is enabled)
 - Offline indicator / last updated time
 - Error state for missing/invalid API keys, connection failures, or an unmatched `macAddress`

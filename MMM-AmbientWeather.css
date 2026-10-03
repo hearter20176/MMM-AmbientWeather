@@ -444,7 +444,9 @@ body.mm-day .aw-error-text {
   padding: 4px 10px;
   border-radius: 10px;
   text-transform: uppercase;
-  animation: pulse 2s infinite alternate;
+  /* A few pulses when the badge appears, not a loop: an infinite animation keeps the compositor
+     busy for as long as the badge exists, even while MMM-pages hides the card. */
+  animation: aw-badge-pulse 2s ease-in-out 3; /* starts and ends at rest: no snap afterwards */
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
@@ -460,7 +462,154 @@ body.mm-day .aw-error-text {
   color: #facc15;
 }
 
-@keyframes pulse {
-  0% { opacity: 0.85; transform: scale(1); }
-  100% { opacity: 1; transform: scale(1.05); }
+@keyframes aw-badge-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.05); }
+}
+
+
+/* === Lightning === */
+
+/* Tile row: two lines (counts, then last strike), icon aligned with the first line. */
+.metric-item.aw-lightning {
+  align-items: flex-start;
+}
+
+.metric-item.aw-lightning i {
+  margin-top: 2px;
+  color: #facc15;
+}
+
+.aw-lightning-last {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.metric-item.aw-lightning-active {
+  color: #fde68a;
+}
+
+/* Day: the theme's custom.css forces --mm-text on every div in this module with !important
+   (specificity 0,3,2), so the highlight needs a more specific !important rule to show. */
+body.mm-day .MMM-AmbientWeather .metric-item.aw-lightning-active div {
+  color: #92400e !important;
+}
+
+body.mm-day .metric-item.aw-lightning i {
+  color: #a16207;
+}
+
+/* Page-wide strike banner. It is appended to <body> (not the module), so it shows on every
+   MMM-pages page. Above normal modules and the package banner, below MM's own alert layer.
+   One entrance and exit transition, no looping animation. */
+.aw-lightning-alert {
+  --aw-la-bg: rgb(14 20 38 / 92%);
+
+  position: fixed;
+  left: 50%;
+  z-index: 200;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: min(960px, calc(100vw - 36px));
+  padding: 16px 24px;
+  color: var(--mm-text, #e9edf5);
+  font-family: "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", -apple-system, system-ui, sans-serif;
+  line-height: 1.3;
+  text-align: left;
+  background: var(--aw-la-bg);
+  border: 1px solid rgb(250 204 21 / 55%);
+  border-radius: 20px;
+  box-shadow: 0 14px 36px rgb(1 4 14 / 55%), inset 0 1px 0 rgb(255 255 255 / 7%);
+  backdrop-filter: blur(22px) saturate(150%);
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.aw-lightning-alert-bottom {
+  bottom: 48px;
+}
+
+.aw-lightning-alert-top {
+  top: 24px;
+}
+
+body.mm-day .aw-lightning-alert {
+  --aw-la-bg: rgb(255 255 255 / 94%);
+
+  border-color: rgb(161 98 7 / 60%);
+  box-shadow: 0 12px 30px rgb(40 56 84 / 22%), inset 0 1px 0 rgb(255 255 255 / 70%);
+}
+
+body.mm-day .aw-lightning-alert.aw-lightning-danger {
+  border-color: rgb(220 38 38 / 70%);
+}
+
+/* Yellow and pale red are too faint on the white day banner (about 1.4:1 to 2.8:1). */
+body.mm-day .aw-lightning-alert-icon {
+  color: #a16207;
+}
+
+body.mm-day .aw-lightning-danger .aw-lightning-alert-icon {
+  color: #dc2626;
+}
+
+.aw-lightning-alert.aw-lightning-danger {
+  border-color: rgb(248 113 113 / 75%);
+  background-image: linear-gradient(rgb(239 68 68 / 16%), rgb(239 68 68 / 16%));
+}
+
+.aw-lightning-alert-icon {
+  flex: 0 0 auto;
+  font-size: 34px;
+  line-height: 1;
+  color: #facc15;
+}
+
+.aw-lightning-danger .aw-lightning-alert-icon {
+  color: #f87171;
+}
+
+.aw-lightning-alert-title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.aw-lightning-alert-detail {
+  margin-top: 2px;
+  font-size: 18px;
+  opacity: 0.85;
+}
+
+/* Entrance: a one-shot keyframe (it runs when the element is inserted). Exit: the leave class. */
+.aw-lightning-alert.aw-lightning-enter {
+  animation: aw-lightning-in 0.6s ease-out 1;
+}
+
+.aw-lightning-alert.aw-lightning-leave {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+}
+
+@keyframes aw-lightning-in {
+  0% { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* Reduced motion: the module's reduceMotion option or "pi" profile (aw-lightning-reduced), or the
+   OS setting. No movement, and no backdrop blur to recomposite over the page while it is up. */
+.aw-lightning-alert.aw-lightning-reduced {
+  animation: none;
+  transition: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aw-lightning-alert,
+  .aw-lightning-alert.aw-lightning-enter {
+    animation: none;
+    transition: none;
+  }
 }

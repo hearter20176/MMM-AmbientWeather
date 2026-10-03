@@ -22,6 +22,13 @@ Module.register("MMM-AmbientWeather", {
     showNwsForecast: true,
     forecastDays: 3,
     forecastCacheMinutes: 90,
+    showLightning: "always", // "always" | "auto" (row only on days with strikes) | "never"
+    lightningAlert: true, // page-wide banner when the lightning sensor reports a new strike
+    lightningAlertDuration: 60, // seconds the banner stays up (each new strike restarts it)
+    lightningAlertCooldown: 10, // minutes after a banner closes before another strike reopens it
+    lightningActiveMinutes: 30, // how long after the last strike the tile shows lightning as active
+    lightningDangerDistance: 6, // strikes this close (mi, or km when metric) are urgent
+    lightningAlertPosition: "bottom", // "bottom" | "top"
     animations: {
       clear: { day: "clear_isDay.json", night: "clear_night.json" },
       partly_cloudy: {
@@ -88,6 +95,15 @@ Module.register("MMM-AmbientWeather", {
     this.forecast = [];
     this.tonight = null;
     this.lastForecastFetch = 0;
+    // Lightning: counters/time from the previous packet (the first packet only sets the baseline,
+    // so a restart never re-announces an old strike), plus the page-wide banner state.
+    this.lightningState = { baselined: false, day: null, time: null };
+    this.lightningAlertEl = null;
+    this.lightningAlertTimer = null;
+    this.lightningRemoveTimer = null;
+    this.lastLightningAlertEnd = 0;
+    this.lastLightningAlertDanger = false;
+    this.lightningCfg = this._normalizeLightningConfig(this.config);
     this.performanceProfile = this._resolvePerformanceProfile();
     this.reduceMotion =
       this.config.reduceMotion === true ||
@@ -139,6 +155,7 @@ Module.register("MMM-AmbientWeather", {
       this.lastUpdate = Date.now();
       this.loaded = true;
       this.offline = false;
+      this._trackLightning(data);
       this._broadcastCurrentConditions(data);
       this.safeUpdateDom(500);
       this._maybeRequestForecast();
@@ -446,6 +463,254 @@ Module.register("MMM-AmbientWeather", {
       days: this.config.forecastDays || 3,
       metric: this.config.units === "metric"
     });
+  },
+
+  // ---- Lightning ----------------------------------------------------------------------------
+  //
+  // Ambient stations with a lightning sensor report lightning_day / lightning_hour (strike counts),
+  // and, once a strike has been logged, lightning_time (last strike) and lightning_distance (miles).
+  // A new strike is a lightning_day increase or a newer lightning_time than the previous packet.
+
+  _num(v) {
+    const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
+    return typeof n === "number" && Number.isFinite(n) ? n : null;
+  },
+
+  // Validates the lightning options once; a bad value logs a warning and falls back to its default.
+  _normalizeLightningConfig(cfg) {
+    const warn = (key, value, used) =>
+      Log.warn(`[${this.name}] Invalid ${key}: ${JSON.stringify(value)}; using ${JSON.stringify(used)}`);
+    const number = (key, def, min) => {
+      const raw = cfg[key];
+      if (raw === undefined) return def;
+      const n = this._num(raw);
+      if (n === null || n < min) {
+        warn(key, raw, def);
+        return def;
+      }
+      return n;
+    };
+    const bool = (key, def) => {
+      const raw = cfg[key];
+      if (raw === undefined) return def;
+      if (raw === true || raw === "true") return true;
+      if (raw === false || raw === "false") return false;
+      warn(key, raw, def);
+      return def;
+    };
+    let show = cfg.showLightning;
+    if (show === true) show = "always";
+    else if (show === false) show = "never";
+    else if (typeof show === "string") show = show.trim().toLowerCase();
+    if (!["always", "auto", "never"].includes(show)) {
+      if (show !== undefined) warn("showLightning", cfg.showLightning, "always");
+      show = "always";
+    }
+    let position = typeof cfg.lightningAlertPosition === "string"
+      ? cfg.lightningAlertPosition.trim().toLowerCase()
+      : cfg.lightningAlertPosition;
+    if (position !== "top" && position !== "bottom") {
+      if (position !== undefined) warn("lightningAlertPosition", cfg.lightningAlertPosition, "bottom");
+      position = "bottom";
+    }
+    return {
+      show,
+      alert: bool("lightningAlert", true),
+      durationMs: number("lightningAlertDuration", 60, 5) * 1000,
+      cooldownMs: number("lightningAlertCooldown", 10, 0) * 60 * 1000,
+      activeMs: number("lightningActiveMinutes", 30, 1) * 60 * 1000,
+      dangerDistance: number("lightningDangerDistance", 6, 0), // 0 disables the urgent style
+      position
+    };
+  },
+
+  // "Now" on the station's clock: lightning_time comes from the station, so its age is measured
+  // against the packet's dateutc (advanced by the time since that packet arrived), not the Pi's
+  // clock. Without dateutc the local clock is used.
+  _stationNow(d) {
+    const stamp = this._lightningTimeMs(d?.dateutc);
+    if (stamp === null) return Date.now();
+    const since = this.lastUpdate ? Math.max(0, Date.now() - this.lastUpdate) : 0;
+    return stamp + since;
+  },
+
+  // lightning_time as epoch ms. The API sends epoch ms; also accepts epoch seconds and ISO strings.
+  _lightningTimeMs(v) {
+    const n = this._num(v);
+    if (n !== null) return n > 0 ? (n < 1e12 ? n * 1000 : n) : null;
+    if (typeof v === "string") {
+      const parsed = Date.parse(v);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+    return null;
+  },
+
+  // Distance in the display unit: { value, unit } or null.
+  _lightningDistance(d) {
+    const mi = this._num(d?.lightning_distance);
+    if (mi === null || mi < 0) return null;
+    return this.config.units === "metric"
+      ? { value: mi * 1.609344, unit: "km" }
+      : { value: mi, unit: "mi" };
+  },
+
+  // True while a strike is recent. Age is measured on the station's clock (see _stationNow), and a
+  // timestamp slightly ahead of that clock (up to 15 min) counts as brand new rather than being
+  // rejected.
+  _lightningActive(timeMs, now = Date.now()) {
+    if (timeMs === null) return false;
+    // More than 15 min ahead of the station's own clock is corrupt data, not a fresh strike.
+    if (timeMs - now > 15 * 60 * 1000) return false;
+    return Math.max(0, now - timeMs) < this.lightningCfg.activeMs;
+  },
+
+  _formatStrikeTime(ms) {
+    if (ms === null) return "";
+    const t = new Date(ms);
+    const time = t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (t.toDateString() === new Date().toDateString()) return time;
+    return `${t.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  },
+
+  // Called for every realtime packet before rendering.
+  _trackLightning(d) {
+    const st = this.lightningState;
+    const day = this._num(d?.lightning_day);
+    const time = this._lightningTimeMs(d?.lightning_time);
+    if (!st.baselined) {
+      st.baselined = true;
+      st.day = day;
+      st.time = time;
+      return;
+    }
+    // lightning_day resets at local midnight; a lower count is a new day, not a strike.
+    const dayRose = day !== null && st.day !== null && day > st.day;
+    const ref = this._stationNow(d);
+    // More than 15 min ahead of the station clock is corrupt (or, without dateutc, a station clock
+    // far ahead of the mirror's): it is neither stored nor reported, and only a day-count rise
+    // can make the packet a strike.
+    const future = time !== null && time - ref > 15 * 60 * 1000;
+    const timeAdvanced = time !== null && !future && (st.time === null || time > st.time);
+    if (day !== null) st.day = day;
+    if (timeAdvanced) st.time = time;
+    if (!dayRose && !timeAdvanced) return;
+    // A timestamp that advanced to a value that is already old is a replay of strikes missed
+    // during a gap (Wi-Fi drop, socket reconnect), not a live strike - even though the day count
+    // usually rose during that gap too. A day-count rise without a usable new timestamp is a
+    // strike whose time is not known yet, so no time is reported with it.
+    if (timeAdvanced && !this._lightningActive(time, ref)) return;
+    this._onLightningStrike(d, timeAdvanced ? time : null);
+  },
+
+  _onLightningStrike(d, time) {
+    const cfg = this.lightningCfg;
+    const dist = this._lightningDistance(d);
+    this.sendNotification("AMBIENT_LIGHTNING", {
+      time: time !== null ? new Date(time).toISOString() : null,
+      distance: dist ? Math.round(dist.value * 10) / 10 : null,
+      unit: dist ? dist.unit : null,
+      strikesHour: this._num(d?.lightning_hour),
+      strikesDay: this._num(d?.lightning_day)
+    });
+    if (!cfg.alert) return;
+
+    const showing = !!this.lightningAlertEl && !this.lightningRemoveTimer;
+    const close = !!dist && cfg.dangerDistance > 0 && dist.value <= cfg.dangerDistance;
+    // An urgent banner stays urgent for its lifetime: a farther strike seconds later only
+    // refreshes the details.
+    const danger = close || (showing && this.lastLightningAlertDanger);
+    // While the banner is up every strike refreshes it. Once it has closed, the cooldown stops a
+    // storm from reopening it on every packet. A close strike after a non-urgent banner skips
+    // the cooldown; after an urgent one it waits like any other strike.
+    const escalated = close && !this.lastLightningAlertDanger;
+    if (!showing && !escalated && Date.now() - this.lastLightningAlertEnd < cfg.cooldownMs) return;
+    this._showLightningAlert(d, time, dist, danger);
+  },
+
+  // The banner lives on document.body, not in getDom(): MMM-pages hides this module on other
+  // pages, and the alert must show on every page. It is a single element reused per strike.
+  _showLightningAlert(d, time, dist, danger) {
+    if (typeof document === "undefined" || !document.body) return;
+    if (this.lightningRemoveTimer) {
+      clearTimeout(this.lightningRemoveTimer);
+      this.lightningRemoveTimer = null;
+    }
+    let el = this.lightningAlertEl;
+    const isNew = !el;
+    if (isNew) {
+      el = document.createElement("div");
+      el.setAttribute("role", "alert");
+      document.body.appendChild(el);
+      this.lightningAlertEl = el;
+    }
+    const classes = ["aw-lightning-alert", `aw-lightning-alert-${this.lightningCfg.position}`];
+    if (danger) classes.push("aw-lightning-danger");
+    if (this.reduceMotion) classes.push("aw-lightning-reduced");
+    else if (isNew) classes.push("aw-lightning-enter");
+    el.className = classes.join(" ");
+
+    const hour = this._num(d?.lightning_hour);
+    const details = [];
+    if (dist) details.push(`${dist.value.toFixed(1)} ${dist.unit} away`);
+    if (time !== null) details.push(this._formatStrikeTime(time));
+    if (hour !== null && hour > 0) details.push(`${hour} ${hour === 1 ? "strike" : "strikes"} in the last hour`);
+    const headline = danger ? "Lightning strike nearby" : "Lightning strike detected";
+    el.innerHTML = `
+      <i class="fa fa-bolt aw-lightning-alert-icon" aria-hidden="true"></i>
+      <div class="aw-lightning-alert-text">
+        <div class="aw-lightning-alert-title">${this._esc(headline)}</div>
+        ${details.length ? `<div class="aw-lightning-alert-detail">${this._esc(details.join(" · "))}</div>` : ""}
+      </div>`;
+    this.lastLightningAlertDanger = danger;
+
+    if (this.lightningAlertTimer) clearTimeout(this.lightningAlertTimer);
+    this.lightningAlertTimer = setTimeout(() => this._hideLightningAlert(), this.lightningCfg.durationMs);
+  },
+
+  _hideLightningAlert() {
+    if (this.lightningAlertTimer) {
+      clearTimeout(this.lightningAlertTimer);
+      this.lightningAlertTimer = null;
+    }
+    const el = this.lightningAlertEl;
+    if (!el || this.lightningRemoveTimer) return;
+    this.lastLightningAlertEnd = Date.now();
+    el.classList.add("aw-lightning-leave");
+    // Matches the CSS fade-out (immediate under reduced motion); then the element is removed
+    // entirely, so no hidden node is left behind.
+    this.lightningRemoveTimer = setTimeout(() => {
+      this.lightningRemoveTimer = null;
+      if (el.parentNode) el.parentNode.removeChild(el);
+      if (this.lightningAlertEl === el) this.lightningAlertEl = null;
+    }, this.reduceMotion ? 0 : 600);
+  },
+
+  // Tile row: icon, strikes today / last hour, and the last strike's time and distance.
+  _lightningRow(d) {
+    const mode = this.lightningCfg.show;
+    if (mode === "never") return null;
+    const day = this._num(d?.lightning_day);
+    const hour = this._num(d?.lightning_hour);
+    if (day === null && hour === null) return null; // station has no lightning sensor
+    if (mode === "auto" && !(day > 0 || hour > 0)) return null;
+    const time = this._lightningTimeMs(d?.lightning_time);
+    const dist = this._lightningDistance(d);
+
+    const row = document.createElement("div");
+    const active = this._lightningActive(time, this._stationNow(d));
+    row.className = `metric-item aw-lightning${active ? " aw-lightning-active" : ""}`;
+    const last = [];
+    if (time !== null) last.push(`Last ${this._formatStrikeTime(time)}`);
+    if (dist) last.push(`${dist.value.toFixed(1)} ${dist.unit}`);
+    // Only when nothing at all is recorded: with counts above zero the time/distance fields can
+    // simply arrive a packet later, so the second line is left out until they do.
+    if (!last.length && !(day > 0 || hour > 0)) last.push("No strikes logged");
+    row.innerHTML = `<i class="fa fa-bolt"></i>
+      <div class="aw-lightning-text">
+        <div>Lightning: ${this._esc(day ?? 0)} today · ${this._esc(hour ?? 0)} last hr</div>
+        ${last.length ? `<div class="aw-lightning-last">${this._esc(last.join(" · "))}</div>` : ""}
+      </div>`;
+    return row;
   },
 
   // ---- Lottie lifecycle -------------------------------------------------------------------
@@ -764,6 +1029,8 @@ Module.register("MMM-AmbientWeather", {
       pr.innerHTML = `${iconHtml}Pressure: ${this._esc(pressure.value.toFixed(2))} ${this._esc(pressure.unit)}${this._esc(trendText)}`;
       metrics.appendChild(pr);
     }
+    const lightningRow = this._lightningRow(d);
+    if (lightningRow) metrics.appendChild(lightningRow);
     right.appendChild(metrics);
 
     // Sunrise / Sunset
@@ -790,10 +1057,12 @@ Module.register("MMM-AmbientWeather", {
       rain.textContent = "RAIN DETECTED";
       alerts.appendChild(rain);
     }
-    if (d.lightning_strike_count || d.lightning_time) {
+    // Only while a strike is recent (lightning_time persists for days after the last one).
+    if (this.lightningCfg.show !== "never" &&
+        this._lightningActive(this._lightningTimeMs(d.lightning_time), this._stationNow(d))) {
       const lightning = document.createElement("div");
       lightning.className = "alert-badge alert-lightning";
-      lightning.textContent = "LIGHTNING ACTIVITY";
+      lightning.textContent = "LIGHTNING NEARBY";
       alerts.appendChild(lightning);
     }
     wrapper.appendChild(alerts);
