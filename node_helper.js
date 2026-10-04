@@ -1,6 +1,6 @@
 /* MagicMirror Module: MMM-AmbientWeather - Node Helper */
 
-const https = require("https");
+const https = require("node:https");
 const Log = require("logger");
 const NodeHelper = require("node_helper");
 const io = require("socket.io-client");

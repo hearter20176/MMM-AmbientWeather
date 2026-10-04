@@ -1,6 +1,6 @@
 # MMM-AmbientWeather
 
-A real-time Ambient Weather display module for MagicMirror2, featuring a liquid-glass UI, Lottie
+A real-time Ambient Weather display module for MagicMirror², featuring a liquid-glass UI, Lottie
 weather icons (with a static icon fallback for low-power devices), and realtime data streaming via
 the Ambient Weather Realtime API.
 
@@ -54,6 +54,16 @@ npm install
 
 Add the module to your MagicMirror `config.js` file (see below).
 
+## Update
+
+```bash
+cd ~/MagicMirror/modules/MMM-AmbientWeather
+git pull
+npm install --omit=dev
+```
+
+Then restart MagicMirror (for example `pm2 restart MagicMirror`).
+
 ## Configuration
 
 Add the following to your `config/config.js`:
@@ -84,7 +94,7 @@ Add the following to your `config/config.js`:
     minWidth: 260,
     maxHeight: null              // optional card height cap in px; null = size to content
   }
-}
+},
 ```
 
 Note: For the weather.gov forecast API, keep `latitude` and `longitude` to 4 decimal places or
@@ -203,7 +213,7 @@ Font Awesome icons when Lottie is disabled.
 
 ## Dependencies
 
-- MagicMirror2
+- MagicMirror²
 - [socket.io-client](https://www.npmjs.com/package/socket.io-client) - realtime connection to the Ambient Weather API
 - [suncalc](https://www.npmjs.com/package/suncalc) - sunrise/sunset fallback when the station doesn't report them
 - A vendored copy of [Lottie](https://airbnb.io/lottie/) (`vendor/lottie.min.js`) for icon animation - no CDN fetch required

@@ -10,9 +10,9 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("fs");
-const path = require("path");
-const vm = require("vm");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 
 const MODULE_PATH = path.join(__dirname, "..", "MMM-AmbientWeather.js");
 
