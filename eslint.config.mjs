@@ -1,9 +1,10 @@
+import { defineConfig } from "eslint/config";
 import js from "@eslint/js";
 import globals from "globals";
 
 // MagicMirror front-end files run in the browser with MagicMirror's globals; node_helper.js and
 // the tests run in Node. Vendored and generated files are not linted.
-export default [
+export default defineConfig([
   {
     ignores: ["node_modules/", "vendor/", "lib/", "animations/", "videos/", "docs/", "coverage/", "**/*.min.js"]
   },
@@ -40,4 +41,4 @@ export default [
     files: ["**/__tests__/**", "**/__mocks__/**", "**/test/**", "**/*.test.js"],
     languageOptions: { globals: { ...globals.jest } }
   }
-];
+]);

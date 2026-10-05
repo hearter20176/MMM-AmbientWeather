@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESLint (flat config) with an `npm run lint` script.
 - Added CHANGELOG, CODE_OF_CONDUCT and a Dependabot configuration.
 
+### Changed
+
+- ESLint 10, with `defineConfig` in `eslint.config.mjs`; `npm run lint` runs `eslint` without the trailing `.`.
+- Updated `socket.io-client` to 4.8.4 and `suncalc` to 2.0.
+
 ## [1.3.1]
 
 Released before this changelog was started. Commit history, newest first:
