@@ -216,7 +216,7 @@ Font Awesome icons when Lottie is disabled.
 - MagicMirror²
 - [socket.io-client](https://www.npmjs.com/package/socket.io-client) - realtime connection to the Ambient Weather API
 - [suncalc](https://www.npmjs.com/package/suncalc) - sunrise/sunset fallback when the station doesn't report them
-- A vendored copy of [Lottie](https://airbnb.io/lottie/) (`vendor/lottie.min.js`) for icon animation - no CDN fetch required
+- [Lottie](https://airbnb.io/lottie/) (the `lottie-web` package, installed by `npm install`) for icon animation - no CDN fetch required
 
 ## Credits
 

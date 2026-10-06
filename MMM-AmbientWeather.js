@@ -68,7 +68,7 @@ Module.register("MMM-AmbientWeather", {
 
   getScripts() {
     if (this._shouldUseLottie()) {
-      return [this.file("vendor/lottie.min.js")];
+      return [this.file("node_modules/lottie-web/build/player/lottie.min.js")];
     }
     return [];
   },

@@ -1,6 +1,7 @@
 import { defineConfig } from "eslint/config";
 import js from "@eslint/js";
 import globals from "globals";
+import packageJson from "eslint-plugin-package-json";
 
 // MagicMirror front-end files run in the browser with MagicMirror's globals; node_helper.js and
 // the tests run in Node. Vendored and generated files are not linted.
@@ -27,7 +28,6 @@ export default defineConfig([
       }
     },
     rules: {
-      "no-unused-vars": ["error", { args: "none", caughtErrors: "none", ignoreRestSiblings: true }],
       // the modules keep /* global ... */ comments for editors without ESLint; they may repeat
       // globals declared above
       "no-redeclare": ["error", { builtinGlobals: false }]
@@ -36,6 +36,19 @@ export default defineConfig([
   {
     files: ["**/*.mjs"],
     languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: { ...globals.node } }
+  },
+  {
+    // the package.json rules modules.magicmirror.builders checks
+    files: ["package.json"],
+    extends: [packageJson.configs.recommended],
+    rules: {
+      "package-json/order-properties": "off",
+      "package-json/require-exports": "off",
+      "package-json/require-files": "off",
+      "package-json/require-sideEffects": "off",
+      "package-json/sort-collections": ["error", ["config", "dependencies", "devDependencies", "exports",
+        "optionalDependencies", "overrides", "peerDependencies", "peerDependenciesMeta"]]
+    }
   },
   {
     files: ["**/__tests__/**", "**/__mocks__/**", "**/test/**", "**/*.test.js"],

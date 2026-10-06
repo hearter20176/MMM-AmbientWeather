@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ESLint 10, with `defineConfig` in `eslint.config.mjs`; `npm run lint` runs `eslint` without the trailing `.`.
 - Updated `socket.io-client` to 4.8.4 and `suncalc` to 2.0.
+- Lottie is the `lottie-web` npm package (pinned to 5.10.2, the same build) instead of a copy in `vendor/`.
+- `package.json`: lowercase package name and `"type": "commonjs"`.
+- ESLint reports unused catch bindings and arguments, and lints `package.json`, as modules.magicmirror.builders does.
 
 ## [1.3.1]
 
