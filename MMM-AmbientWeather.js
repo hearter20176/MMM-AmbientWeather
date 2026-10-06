@@ -67,7 +67,10 @@ Module.register("MMM-AmbientWeather", {
   },
 
   getScripts() {
-    if (this._shouldUseLottie()) {
+    // Lottie is shared with the other Glass modules (all pin lottie-web 5.10.2).
+    // MagicMirror loads each module's scripts before asking the next for its
+    // list, so skip it when an earlier module already provided the global.
+    if (this._shouldUseLottie() && typeof lottie === "undefined") {
       return [this.file("node_modules/lottie-web/build/player/lottie.min.js")];
     }
     return [];
